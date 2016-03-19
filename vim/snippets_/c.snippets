@@ -1,0 +1,124 @@
+# main()
+snippet main
+	int main(int argc, char const* argv[])
+	{
+		${1}
+		return 0;
+	}
+
+# #include "..."
+snippet #include
+	#include "${1}"${2}
+# #ifndef ... #define ... #endif
+snippet #ifndef
+	#ifndef ${1}
+		${2:#define }
+	#endif
+
+snippet #ifdef
+	#ifdef ${1}
+		${2:#define }
+	#endif
+
+snippet #if
+	#if ${1}
+		${2}
+	#endif
+
+# if condition
+snippet if
+	if (${1})
+	{
+	}
+snippet else
+	else 
+	{
+		${1}
+	}
+
+# tertiary conditional
+snippet ?
+	((${1})? () : ())
+# do while 
+snippet do
+	do
+	{
+
+	} while (${1});
+
+# while
+snippet while
+	while (${1})
+	{
+	}
+
+# for
+snippet for
+	for (${1}; ; )
+	{
+	}
+
+# for2
+snippet for2
+	for (${1}; ; )
+	{
+		for (; ; )
+		{
+		
+		}
+	}
+
+# struct
+snippet struct
+	typedef struct __${1:type}_t
+	{
+		${3}
+
+	}${2:type}_t;
+
+# enum
+snippet enum
+	typedef enum __${1:type}_t
+	{
+		${3}
+
+	}${2:type}_t;
+
+# array
+snippet[]
+	] = 
+	{
+		${1}
+	};
+
+# comment block
+snippet /*
+	/* ////////////////////////////////////////////////////////////////////////
+	 * ${1}
+	 */${2}
+
+# header
+snippet #header
+	/*!${1:The Project Name}
+	 * 
+	 * ${2:project} is free software; you can redistribute it and/or modify
+	 * it under the terms of the GNU General Public License as published by
+	 * the Free Software Foundation; either version 2 of the License, or
+	 * (at your option) any later version.
+	 * 
+	 * ${3:project} is distributed in the hope that it will be useful,
+	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
+	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	 * GNU General Public License for more details.
+	 * 
+	 * You should have received a copy of the GNU General Public License
+	 * along with ${4:project}; 
+	 * If not, see <a href="http://www.gnu.org/licenses/"> http://www.gnu.org/licenses/</a>
+	 * 
+	 * Copyright (C) `strftime("%Y")`, ruki All rights reserved.
+	 *
+	 * \author		ruki
+	 * \file		${5:file}
+	 *
+	 */${6}
+

@@ -1,0 +1,113 @@
+
+
+vim常用插件介绍：
+ 
+vim是Linux下强大的编辑器之一，是每个linuxer并不可少的工具。vim的插件扩展
+工能为vim增加了不少的特色。关于如何将vim打造IDE网上的资料也不少，下面只是
+我自己对vim的配置。
+ 
+推荐文章：http://blog.csdn.net/wooin 
+<<手把手教你把 Vim 改装成一个 IDE 编程环境>>
+ 
+工具或插件介绍，如想进一步了解请参照官方文档。
+1) Exuberant Ctags : 它可以为你的源码产生一个tags文件，并且在tags文件中记录
+源文件的索引以帮助你快速得找到某个符号的定义。它支持相当多的语言，如C、C++、C#、Shell等等。
+常用命令：Ctrl+] 跳到声明定义处  Ctrl+T 跳回原处
+下载地址：http://ctags.sourceforge.net
+
+2) trinity.vim : Build the trinity of srcexpl, taglist, NERD_tree to
+be a good IDE. 这个插件将 srcexpl、taglist、NERD_tree这三个插件集中起来做成IDE
+taglist: Source code browser (supports C/C++, java etc)
+srcexpl: A Source code Explorer based on tags works like context
+         window in Source Insight
+NERD_tree: A tree explorer plugin for navigating the filesystem
+下载地址：http://www.vim.org/scripts/script.php?script_id=2347
+
+3) omnicppcomplete： C/C++ omni-completion with ctags database
+这个插件用于自动补全，可用于 . ->  :: 等操作符。
+下载地址：http://www.vim.org/scripts/script.php?script_id=1520
+
+4) c.vim: C/C++ IDE --  Write and run programs. Insert statements, idioms, 
+comments etc. 这个插件的功能比较多,它集成了编译、链接、运行、注释等许多IDE常用的功能。
+下载地址：http://www.vim.org/scripts/script.php?script_id=213
+
+5) echofunc.vim : Echo the function declaration in the command line for C/C++.
+这个插件主要用于显示函数声明。
+下载地址：http://www.vim.org/scripts/script.php?script_id=1735
+ 
+6) stl.vim： Improved C++ STL syntax highlighting.
+原来的vim对C＋＋的语法高亮不支持像string、 vector之类的STL模板类。
+下载地址：http://www.vim.org/scripts/script.php?script_id=2224
+
+7) stlrefvim.vim: A C++ Standard Template Library reference manual.
+这个插件让你轻松的拥有C++　STL的文档帮助
+下载地址：http://www.vim.org/scripts/script.php?script_id=2353
+
+知道了这个插件的作用之后就可以行动了，首先需要具备一些vim的基本知识：像如何使用插件(每个插件
+都有它的安装帮助）、vim一些文件夹的作用（如plugin,syntax...)、vim键映射等。
+建议在使用这些插件之前先读一读它的文档，了解一下这些插件的作用和主要的功能，并且看一下它的文件
+结构，大概看一下它的源码，这样就方便你以后对插件的修改（如改变快捷键映射）。这个学习过程并不困
+难也无须花大量的时间。
+
+下面是我的vim配置文件
+
+"基本配置
+set mouse=a                 "启动鼠标功能
+set nocompatible         "不兼容旧版本
+set nu                   "显示行号
+set tabstop=4            "tab=4
+set shiftwidth=4         "缩进4
+set wrap                 "折行
+set ruler                "在vim窗口右下角显示光标位置
+set ignorecase           "忽略大小写
+"set hlsearch             "查找时高亮显示
+set showmode             "显示当前工作模式
+
+syntax enable            "打开色彩
+syntax on                "打开语法高亮
+set cindent              "使用C语言的缩进方式
+set autoindent             "自动缩进
+set showmatch            "显示括号配对
+set smartindent          "智能对齐
+"set whichwrap+=h,l      "使用h,l移动可以跨行
+"set mps+=<:>            "让<>可以使用%跳转
+"set foldmarker={{{,}}}
+
+"备份相关配置
+set nobackup            
+set backupext=.bak      
+set writebackup          "写备份但关闭vim后自动删除
+"set backupdir=path      "设置备份路径
+
+"Omnicppcomplete Configuration
+"下面两行开启了vim三种智能
+"1.自动识别file类型
+"2.用file type plugin脚本
+"3.使用缩进定义文件
+"set nocompatible
+filetype plugin on
+filetype indent on
+let OmniCpp_DefaultNamespaces=["std"]
+let OmniCpp_MayCompleteScope=1
+set completeopt=longest,menu          "关掉智能补全时的预览窗口
+map <silent> <F12> :!ctags -R --c++-kinds=+p --fields=+iaS --extra=+q .<CR>
+set tags+=/usr/include/c++/4.2.4/tags
+
+"Tlist Configuration  taglist.vim
+let Tlist_Process_File_Always=1     "Always Process File
+"let Tlist_Auto_Open=1              "Open Tlist when vim start
+let Tlist_Enable_Fold_Column=1       
+let Tlist_Exit_OnlyWindow=1         "If only Tlist window works, vim exit.
+let Tlist_Sort_Type="name"          "sort by name
+let Tlist_Show_One_File=1
+
+"echofunc Configuration
+let g:EchoFuncKeyPrev='<C-b>'
+let g:EchoFuncKeyNext='<C-n>'
+
+"trinity.vim: Build the trinity of srcexpl,taglist,
+"NERD_tree to be a good IDE
+nmap <F8> :TrinityToggleAll<CR>
+nmap <F9> :TrinityToggleSourceExplorer<CR>
+nmap <F10> :TrinityToggleTagList<CR>
+nmap <F11> :TrinityToggleNERDTree<CR>

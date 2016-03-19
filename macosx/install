@@ -1,0 +1,8 @@
+#sbin/bash
+rm -f ~/.vimrc
+rm -rf ~/.vim
+cp ./vimrc ~/.vimrc
+cp -r ../vim ~/.vim
+rm -rf ~/.stardict/
+mkdir ~/.stardict/
+cp -r ../dic ~/.stardict/

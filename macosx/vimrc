@@ -1,0 +1,262 @@
+""""""""""""""""""""""""""""""""""""""
+" 语法着色与高亮设置
+""""""""""""""""""""""""""""""""""""""
+
+"开启语法高亮
+syntax enable
+syntax on
+
+"配色
+colo ruki
+colors ruki
+
+"设置高亮搜索
+:set hlsearch
+
+""""""""""""""""""""""""""""""""""""""
+" 文件设置
+""""""""""""""""""""""""""""""""""""""
+"set autochdir
+set encoding=utf-8
+set fileencoding=chinese
+set fileencodings=ucs-bom,utf-8,chinese 
+set ambiwidth=double
+set langmenu=zh_CN.UTF-8
+set imcmdline
+source $VIMRUNTIME/delmenu.vim
+source $VIMRUNTIME/menu.vim
+
+"检测文件的类型
+filetype on 
+
+"默认无备份
+:set nobackup
+:set nowritebackup
+
+""""""""""""""""""""""""""""""""""""""
+" 鼠标设置
+""""""""""""""""""""""""""""""""""""""
+
+"鼠标支持
+if has('mouse')
+:set mouse=a
+endif
+
+"使鼠标用起来象微软 Windows,似乎正好解决 连续多行缩进问题、退格问题
+:behave mswin
+
+""""""""""""""""""""""""""""""""""""""
+" 编辑器设置
+""""""""""""""""""""""""""""""""""""""
+
+"显示行号
+set number
+
+"Tab 宽度
+:set ts=4
+:set expandtab
+
+"自动缩进
+:set sw=4
+
+"C/C++ 风格的自动缩进
+:set cin
+"设定 C/C++ 风格自动缩进的选项
+:set cino=:0g0t0(sus
+
+"打开普通文件类型的自动缩进
+:set ai
+
+"在编辑过程中，在右下角显示光标位置的状态行
+:set ruler
+
+"显示匹配括号
+:set showmatch
+
+"在insert模式下能用删除键进行删除
+:set backspace=indent,eol,start
+
+"代码折叠, 命令 za
+:set foldmethod=syntax
+:set foldlevel=100  "启动vim时不要自动折叠代码
+
+"设置字体 
+:set guifont=courier\ new:h14
+
+"当右键单击窗口的时候， 弹出快捷菜单
+:set mousemodel=popup
+
+"自动换行
+if (has("gui_running"))	"图形界面下的设置
+
+"指定不折行。如果一行太长，超过屏幕宽度，则向右边延伸到屏幕外面
+:set nowrap
+"添加水平滚动条。如果你指定了不折行，那为窗口添加一个水平滚动条就非常有必要了
+:set guioptions+=b
+
+else	"字符界面下的设置
+   set wrap
+endif
+
+
+""""""""""""""""""""""""""""""""""""""
+" 快捷键设置
+""""""""""""""""""""""""""""""""""""""
+"<F1>菜单栏与工具栏隐藏与显示动态切换
+set guioptions-=m
+set guioptions+=T
+map <silent> <F1> :if &guioptions =~# 'm' <Bar>
+        \set guioptions-=m <Bar>
+    \else <Bar>
+        \set guioptions+=m <Bar>
+    \endif<CR>
+
+"<F2>code_complete.vim插件：函数自动完成
+"if !exists("g:completekey")
+"    let g:completekey = "<F2>"   "hotkey
+"endif
+
+" 单词翻译
+map <F3> :!sdcv -n <C-R>=expand("<cword>")<CR><CR>
+
+" 替换所有tab到空格
+map <F4> :%retab!<CR>
+
+"符号浏览窗口
+map <F5> :SrcExplToggle<CR><CR>
+
+" 标记窗口
+map <F6> :MarksBrowser<CR> 
+
+"生成doxygen接口注释
+let g:DoxygenToolkit_authorName="ruki"
+map <F7> :Dox<CR>
+
+"统计行数
+map <F8> :!wc -l `find ./ -name "*.c"`
+
+"映射复制、粘贴、剪贴ctrl+c ctrl+v ctrl+x
+:map <C-V> "+pa<Esc>
+:map! <C-V> <Esc>"+pa
+:map <C-C> "+y
+:map <C-X> "+x
+:map <C-Z> "+u
+
+" 映射全选 ctrl+a
+:map <C-A> ggVG
+:map! <C-A> <Esc>ggVG
+
+" 多行缩进
+:map <Tab> >
+:map <S-Tab> <
+
+" 映射 git mergetool -t gvimdiff
+map <silent> <leader>1 :diffget <CR> 
+map <silent> <leader>2 :diffget 2<CR>
+map <silent> <leader>3 :diffget 3<CR>
+map <silent> <leader>4 :diffget 4<CR>
+
+""""""""""""""""""""""""""""""""""""""
+" 插件设置
+""""""""""""""""""""""""""""""""""""""
+
+" 加载插件管理器: plugins root: .vim/bundle
+execute pathogen#infect()
+
+" 加载 ycm 配置文件
+"let g:ycm_global_ycm_extra_conf = '~/.vim/bundle/YouCompleteMe/cpp/ycm/.ycm_extra_conf.py'
+"let g:ycm_auto_trigger = 0
+"let g:ycm_key_list_select_completion = ['<C-TAB>', '<Down>']
+"let g:ycm_key_list_previous_completion = ['<C-S-TAB>', '<Up>']
+"let g:SuperTabDefaultCompletionType = '<Tab>'
+
+"开启OmniCppComplete.vim
+set nocp
+filetype plugin on
+
+"2Html插件，启用XHtml css
+:let html_number_lines=1
+:let html_use_css=1
+:let use_xhtml=1
+
+"fencview.vim 插件设置
+let g:fencview_autodetect = 1  "打开文件时自动识别编码
+let g:fencview_checklines = 10 "检查前后10行来判断编码
+
+"autocomplpop.vim & supertab.vim 插件设置
+let g:AutoComplPop_IgnoreCaseOption=1
+set ignorecase
+
+" TagList
+let g:Tlist_Show_One_File=1
+let g:Tlist_File_Fold_Auto_Close=1
+let g:Tlist_Exit_OnlyWindow=1
+
+" NERDTree
+"let g:NERDTreeWinPos="right"
+let g:NERDTreeIgnore=['\.o$', '\~$', '\.a$', '\.swp$', '\.so$', '\.b$', '\.bak$', '\.out$']
+
+" WindowManager
+let g:winManagerWindowLayout = "TagList,NERDTree|BufExplorer"
+let g:winManagerAutoOpen = 1
+let g:winManagerWidth = 30
+
+let g:NERDTree_title = "[NERDTree]" 
+function! NERDTree_Start() 
+    exe 'NERDTree'
+endfunction 
+
+function! NERDTree_IsValid() 
+	return 1 
+endfunction
+
+au VimEnter * WMToggle
+"au VimEnter * q
+
+" cscope
+if has("cscope")
+	set csprg=/usr/bin/cscope
+	set csto=0
+	set cst
+	set nocsverb
+	" add any database in current directory
+	if filereadable("cscope.out")
+		cs add cscope.out
+	" else add database pointed to by environment
+	elseif $CSCOPE_DB != ""
+		cs add $CSCOPE_DB
+	endif
+	set csverb
+endif
+
+" ShowMarks
+let showmarks_enable = 1
+" Show which marks
+let showmarks_include = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+" Ignore help, quickfix, non-modifiable buffers
+let showmarks_ignore_type = "hqm"
+" Hilight lower & upper marks
+let showmarks_hlline_lower = 1
+let showmarks_hlline_upper = 1 
+
+" lookupfile
+let g:LookupFile_MinPatLength = 2               "最少输入2个字符才开始查找
+let g:LookupFile_PreserveLastPattern = 0        "不保存上次查找的字符串
+let g:LookupFile_PreservePatternHistory = 1     "保存查找历史
+let g:LookupFile_AlwaysAcceptFirst = 1          "回车打开第一个匹配项目
+let g:LookupFile_AllowNewFiles = 0              "不允许创建不存在的文件
+
+"映射LookupFile为,lk
+nmap <silent> <leader>lk :LUTags<cr>
+"映射LUBufs为,ll
+nmap <silent> <leader>lb :LUBufs<cr>
+"映射LUWalk为,lw
+nmap <silent> <leader>lw :LUWalk<cr>
+
+""""""""""""""""""""""""""""""""""""""
+" 其他设置
+""""""""""""""""""""""""""""""""""""""
+
+
+"去掉讨厌的有关vi一致性模式，避免以前版本的一些bug和局限
+:set nocompatible
