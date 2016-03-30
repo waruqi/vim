@@ -1,9 +1,9 @@
 ## 本人私用多年的vim配置
 
 截图如下：
-[![1](https://github.com/waruqi/vim/raw/master/doc/1.png)]
-[![2](https://github.com/waruqi/vim/raw/master/doc/2.png)]
-[![3](https://github.com/waruqi/vim/raw/master/doc/3.png)]
+![1](https://github.com/waruqi/vim/raw/master/doc/1.png)
+![2](https://github.com/waruqi/vim/raw/master/doc/2.png)
+![3](https://github.com/waruqi/vim/raw/master/doc/3.png)
 
 我在toolbar上加了些图标按钮，用来实现sourceinsight里面的各种跳转功能。
 里面具体有哪些插件和具体使用方式，等以后有时间了再细说吧。
