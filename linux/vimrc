@@ -253,10 +253,15 @@ nmap <silent> <leader>lb :LUBufs<cr>
 "映射LUWalk为,lw
 nmap <silent> <leader>lw :LUWalk<cr>
 
+" Start interactive EasyAlign in visual mode (e.g. vipga)
+xmap ga <Plug>(EasyAlign)
+
+" Start interactive EasyAlign for a motion/text object (e.g. gaip)
+nmap ga <Plug>(EasyAlign)
+
 """"""""""""""""""""""""""""""""""""""
 " 其他设置
 """"""""""""""""""""""""""""""""""""""
-
 
 "去掉讨厌的有关vi一致性模式，避免以前版本的一些bug和局限
 :set nocompatible
