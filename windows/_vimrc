@@ -136,11 +136,15 @@ map <F7> :Dox<CR>
 map <F8> :!wc -l `find ./ -name "*.c"`
 
 "映射复制、粘贴、剪贴ctrl+c ctrl+v ctrl+x
-:map <C-V> "+pa<Esc>
-:map! <C-V> <Esc>"+pa
+":map <C-V> "+pa<Esc>
+":map! <C-V> <Esc>"+pa
 :map <C-C> "+y
 :map <C-X> "+x
 :map <C-Z> "+u
+" Paste from clipboard when in insert mode.
+imap <C-V> <ESC>"+gpa
+" Paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
+vmap <C-V> "+gp
 
 " 映射全选 ctrl+a
 :map <C-A> ggVG
@@ -241,7 +245,10 @@ let showmarks_hlline_lower = 1
 let showmarks_hlline_upper = 1 
 
 " MarksBrowser
-map <silent>ml :MarksBrowser<CR> 
+map <silent><leader>ml :MarksBrowser<CR> 
+
+" a.vim
+map <silent><leader>h :A<CR>
 
 " lookupfile
 "let g:LookupFile_MinPatLength = 2               "最少输入2个字符才开始查找
