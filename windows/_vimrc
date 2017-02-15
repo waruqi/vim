@@ -128,9 +128,6 @@ map <F4> :%retab!<CR>
 "符号浏览窗口
 map <F5> :SrcExplToggle<CR><CR>
 
-" 标记窗口
-map <F6> :MarksBrowser<CR> 
-
 "生成doxygen接口注释
 let g:DoxygenToolkit_authorName="ruki"
 map <F7> :Dox<CR>
@@ -194,26 +191,27 @@ set ignorecase
 let g:Tlist_Show_One_File=1
 let g:Tlist_File_Fold_Auto_Close=1
 let g:Tlist_Exit_OnlyWindow=1
+map <silent> <leader>t :TlistToggle<CR>
 
 " NERDTree
-"let g:NERDTreeWinPos="right"
+let g:NERDTreeWinPos="right"
 let g:NERDTreeIgnore=['\.o$', '\~$', '\.a$', '\.swp$', '\.so$', '\.b$', '\.bak$', '\.out$']
+let g:NERDChristmasTree=1
+let g:NERDTreeAutoCenter=1
+let g:NERDTreeQuitOnOpen=1
+map <silent> <leader>f :NERDTreeToggle<CR>
+
+" buffergator
+let g:buffergator_suppress_keymaps = 1
+let g:buffergator_viewport_split_policy = "B"
+map <silent> <leader>b :BuffergatorToggle<CR>
 
 " WindowManager
-let g:winManagerWindowLayout = "TagList,NERDTree|BufExplorer"
-let g:winManagerAutoOpen = 1
-let g:winManagerWidth = 30
+"let g:winManagerWindowLayout = "TagList,NERDTree|BufExplorer"
+"let g:winManagerAutoOpen = 1
+"let g:winManagerWidth = 30
 
-let g:NERDTree_title = "[NERDTree]" 
-function! NERDTree_Start() 
-    exe 'NERDTree'
-endfunction 
-
-function! NERDTree_IsValid() 
-	return 1 
-endfunction
-
-au VimEnter * WMToggle
+"au VimEnter * WMToggle
 "au VimEnter * q
 
 " cscope
@@ -242,23 +240,26 @@ let showmarks_ignore_type = "hqm"
 let showmarks_hlline_lower = 1
 let showmarks_hlline_upper = 1 
 
+" MarksBrowser
+map <silent>ml :MarksBrowser<CR> 
+
 " lookupfile
-let g:LookupFile_MinPatLength = 2               "最少输入2个字符才开始查找
-let g:LookupFile_PreserveLastPattern = 0        "不保存上次查找的字符串
-let g:LookupFile_PreservePatternHistory = 1     "保存查找历史
-let g:LookupFile_AlwaysAcceptFirst = 1          "回车打开第一个匹配项目
-let g:LookupFile_AllowNewFiles = 0              "不允许创建不存在的文件
+"let g:LookupFile_MinPatLength = 2               "最少输入2个字符才开始查找
+"let g:LookupFile_PreserveLastPattern = 0        "不保存上次查找的字符串
+"let g:LookupFile_PreservePatternHistory = 1     "保存查找历史
+"let g:LookupFile_AlwaysAcceptFirst = 1          "回车打开第一个匹配项目
+"let g:LookupFile_AllowNewFiles = 0              "不允许创建不存在的文件
 
 "映射LookupFile为,lk
-nmap <silent> <leader>lk :LUTags<cr>
+"nmap <silent> <leader>lk :LUTags<cr>
 "映射LUBufs为,ll
-nmap <silent> <leader>lb :LUBufs<cr>
+"nmap <silent> <leader>lb :LUBufs<cr>
 "映射LUWalk为,lw
-nmap <silent> <leader>lw :LUWalk<cr>
+"nmap <silent> <leader>lw :LUWalk<cr>
 
+" EasyAlign
 " Start interactive EasyAlign in visual mode (e.g. vipga)
 xmap ga <Plug>(EasyAlign)
-
 " Start interactive EasyAlign for a motion/text object (e.g. gaip)
 nmap ga <Plug>(EasyAlign)
 
