@@ -164,16 +164,6 @@ map <silent> <leader>4 :diffget 4<CR>
 " 插件设置
 """"""""""""""""""""""""""""""""""""""
 
-" 加载插件管理器: plugins root: .vim/bundle
-execute pathogen#infect()
-
-" 加载 ycm 配置文件
-"let g:ycm_global_ycm_extra_conf = '~/.vim/bundle/YouCompleteMe/cpp/ycm/.ycm_extra_conf.py'
-"let g:ycm_auto_trigger = 0
-"let g:ycm_key_list_select_completion = ['<C-TAB>', '<Down>']
-"let g:ycm_key_list_previous_completion = ['<C-S-TAB>', '<Up>']
-"let g:SuperTabDefaultCompletionType = '<Tab>'
-
 "开启OmniCppComplete.vim
 set nocp
 filetype plugin on
@@ -210,14 +200,6 @@ let g:buffergator_suppress_keymaps = 1
 let g:buffergator_viewport_split_policy = "B"
 map <silent> <leader>b :BuffergatorToggle<CR>
 
-" WindowManager
-"let g:winManagerWindowLayout = "TagList,NERDTree|BufExplorer"
-"let g:winManagerAutoOpen = 1
-"let g:winManagerWidth = 30
-
-"au VimEnter * WMToggle
-"au VimEnter * q
-
 " cscope
 if has("cscope")
 	set csprg=/usr/bin/cscope
@@ -249,20 +231,6 @@ map <silent><leader>ml :MarksBrowser<CR>
 
 " a.vim
 map <silent><leader>h :A<CR>
-
-" lookupfile
-"let g:LookupFile_MinPatLength = 2               "最少输入2个字符才开始查找
-"let g:LookupFile_PreserveLastPattern = 0        "不保存上次查找的字符串
-"let g:LookupFile_PreservePatternHistory = 1     "保存查找历史
-"let g:LookupFile_AlwaysAcceptFirst = 1          "回车打开第一个匹配项目
-"let g:LookupFile_AllowNewFiles = 0              "不允许创建不存在的文件
-
-"映射LookupFile为,lk
-"nmap <silent> <leader>lk :LUTags<cr>
-"映射LUBufs为,ll
-"nmap <silent> <leader>lb :LUBufs<cr>
-"映射LUWalk为,lw
-"nmap <silent> <leader>lw :LUWalk<cr>
 
 " EasyAlign
 " Start interactive EasyAlign in visual mode (e.g. vipga)
