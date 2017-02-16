@@ -6,3 +6,4 @@ cp -r ../vim ~/.vim
 rm -rf ~/.stardict/
 mkdir ~/.stardict/
 cp -r ../dic ~/.stardict/
+cp ../ctags ~/.ctags

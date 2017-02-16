@@ -438,6 +438,10 @@ let s:tlist_def_fortran_settings = 'fortran;p:program;b:block data;' .
 " GO language
 let s:tlist_def_go_settings = 'go;f:function;p:package;t:struct'
 
+
+" scala language
+let s:tlist_def_scala_settings = 'scala;t:trait;c:class;T:type;m:method;p:package;o:object'
+
 " HTML language
 let s:tlist_def_html_settings = 'html;a:anchor;f:function'
 
