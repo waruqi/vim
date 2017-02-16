@@ -143,6 +143,9 @@ imap <C-V> <ESC>"+gpa
 " Paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
 vmap <C-V> "+gp
 
+" fix paste bug for vim + tmux
+set clipboard=unnamed
+
 " 映射全选 ctrl+a
 :map <C-A> ggVG
 :map! <C-A> <Esc>ggVG
@@ -241,3 +244,4 @@ nmap ga <Plug>(EasyAlign)
 
 "去掉讨厌的有关vi一致性模式，避免以前版本的一些bug和局限
 :set nocompatible
+
