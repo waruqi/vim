@@ -7,8 +7,8 @@ syntax enable
 syntax on
 
 "配色
-colo ruki
-colors ruki
+colo ruki_dark
+colors ruki_dark
 
 "设置高亮搜索
 :set hlsearch
