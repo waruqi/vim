@@ -197,7 +197,7 @@ let g:NERDTreeIgnore=['\.o$', '\~$', '\.a$', '\.swp$', '\.so$', '\.b$', '\.bak$'
 let g:NERDChristmasTree=1
 let g:NERDTreeAutoCenter=1
 let g:NERDTreeQuitOnOpen=1
-map <silent> <leader>f :NERDTreeToggle<CR>
+map <silent> <leader>ff :NERDTreeToggle<CR>
 
 " cscope
 if has("cscope")
