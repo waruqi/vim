@@ -199,11 +199,6 @@ let g:NERDTreeAutoCenter=1
 let g:NERDTreeQuitOnOpen=1
 map <silent> <leader>f :NERDTreeToggle<CR>
 
-" buffergator
-let g:buffergator_suppress_keymaps = 1
-let g:buffergator_viewport_split_policy = "B"
-map <silent> <leader>b :BuffergatorToggle<CR>
-
 " cscope
 if has("cscope")
 	set csprg=/usr/bin/cscope

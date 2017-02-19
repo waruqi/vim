@@ -77,7 +77,7 @@ function! g:LfNoErrMsgCmd(cmd)
 endfunction
 
 call s:InitVar('g:Lf_ShortcutF', '<Leader>ff')
-call s:InitVar('g:Lf_ShortcutB', '<Leader>fb')
+call s:InitVar('g:Lf_ShortcutB', '<Leader>b')
 call s:InitVar('g:Lf_WindowPosition', 'bottom')
 call s:InitVar('g:Lf_WindowHeight', 0.3)
 call s:InitVar('g:Lf_TabpagePosition', 2)
