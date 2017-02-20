@@ -15,28 +15,29 @@ let g:colors_name = "ruki"
 if (has("gui_running"))
 
 hi Normal			gui=None		guifg=Black		guibg=#f5f5f5
-hi PreProc			gui=None		guifg=Red		guibg=NONE
-hi Keyword			gui=NONE		guifg=Blue		guibg=NONE
-hi Type				gui=NONE		guifg=Blue		guibg=NONE
-hi Comment			gui=italic		guifg=#008000	guibg=NONE
-hi Constant			gui=NONE		guifg=#800080	guibg=NONE
-hi String			gui=NONE		guifg=#FF00FF	guibg=NONE
-hi Statement		gui=NONE		guifg=Blue		guibg=NONE
-hi LineNr			gui=NONE		guifg=#808080	guibg=NONE
+hi PreProc			gui=None		guifg=Red		guibg=None
+hi Keyword			gui=None		guifg=Blue		guibg=None
+hi Type				gui=None		guifg=Blue		guibg=None
+hi Comment			gui=Italic		guifg=#008000	guibg=None
+hi Constant			gui=None		guifg=#800080	guibg=None
+hi String			gui=None		guifg=#FF00FF	guibg=None
+hi Statement		gui=None		guifg=Blue		guibg=None
+hi LineNr			gui=None		guifg=#808080	guibg=None
 
 else
 
-hi Cursor	        cterm=None      ctermfg=LightGray
-hi Normal			cterm=None		ctermfg=White		ctermbg=NONE
-hi PreProc			cterm=None		ctermfg=Red	        ctermbg=NONE
-hi Keyword			cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
-hi Type				cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
-hi Comment			cterm=NONE	    ctermfg=LightGreen	ctermbg=NONE
-hi Constant			cterm=NONE		ctermfg=Brown		ctermbg=NONE
-hi String			cterm=NONE		ctermfg=Magenta     ctermbg=NONE
-hi Statement		cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
-hi LineNr			cterm=NONE		ctermfg=LightGray	ctermbg=NONE
-hi Title            cterm=NONE      ctermfg=Magenta     ctermbg=NONE
+hi Normal			cterm=None		ctermfg=White		ctermbg=None
+hi PreProc			cterm=None		ctermfg=Red	        ctermbg=None
+hi Keyword			cterm=None		ctermfg=LightBlue	ctermbg=None
+hi Type				cterm=None		ctermfg=LightBlue	ctermbg=None
+hi Comment			cterm=None	    ctermfg=LightGreen	ctermbg=None
+hi Constant			cterm=None		ctermfg=Brown		ctermbg=None
+hi String			cterm=None		ctermfg=Magenta     ctermbg=None
+hi Statement		cterm=None		ctermfg=LightBlue	ctermbg=None
+hi LineNr			cterm=None		ctermfg=LightGray	ctermbg=None
+hi Title            cterm=None      ctermfg=Magenta     ctermbg=None
+hi VertSplit	    cterm=Reverse
+hi Visual	        cterm=reverse
 
 endif
 
