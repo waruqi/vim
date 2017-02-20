@@ -26,12 +26,12 @@ else
 hi Cursor	        cterm=None      ctermfg=LightGray
 hi Normal			cterm=None		ctermfg=White		ctermbg=NONE
 hi PreProc			cterm=None		ctermfg=LightRed	ctermbg=NONE
-hi Keyword			cterm=NONE		ctermfg=Lightblue	ctermbg=NONE
+hi Keyword			cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
 hi Type				cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
 hi Comment			cterm=NONE	    ctermfg=LightGreen	ctermbg=NONE
 hi Constant			cterm=NONE		ctermfg=Brown		ctermbg=NONE
 hi String			cterm=NONE		ctermfg=Magenta     ctermbg=NONE
-hi Statement		cterm=NONE		ctermfg=LightRed	ctermbg=NONE
+hi Statement		cterm=NONE		ctermfg=LightBlue	ctermbg=NONE
 hi LineNr			cterm=NONE		ctermfg=LightGray	ctermbg=NONE
 
 endif
