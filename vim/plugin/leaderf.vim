@@ -97,7 +97,7 @@ call s:InitVar('g:Lf_HighlightIndividual', 1)
 call s:InitVar('g:Lf_NumberOfHighlight', 100)
 call s:InitVar('g:Lf_WildIgnore',{
             \ 'dir': ['.svn','.git'],
-            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]', '.DS_Store', '*.lib', '*.obj', '*.pdb', '*.dep']
+            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]', '.DS_Store', '*.lib', '*.obj', '*.pdb', '*.dep', '*.jar']
             \})
 call s:InitVar('g:Lf_StlSeparator',{
             \ 'left': '►',

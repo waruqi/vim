@@ -181,18 +181,132 @@ let g:fencview_checklines = 10 "检查前后10行来判断编码
 let g:AutoComplPop_IgnoreCaseOption=1
 set ignorecase
 
-" TagList
-"let g:Tlist_Show_One_File=1
-"let g:Tlist_File_Fold_Auto_Close=1
-"let g:Tlist_Exit_OnlyWindow=1
-"map <silent> <leader>t :TlistToggle<CR>
-
 " tagbar
 let g:tagbar_left = 1
 let g:tagbar_autofocus = 1
 let g:tagbar_expand = 1
 let g:tagbar_singleclick = 1
-map <silent> <leader>t :TagbarToggle<CR>
+map <silent> <leader>s :TagbarToggle<CR>
+
+let g:tagbar_type_scala = {
+    \ 'ctagstype' : 'scala',
+    \ 'sro'       : '.',
+    \ 'kinds'     : [
+      \ 'p:packages',
+      \ 'T:types:1',
+      \ 't:traits',
+      \ 'o:objects',
+      \ 'O:case objects',
+      \ 'c:classes',
+      \ 'C:case classes',
+      \ 'm:methods',
+      \ 'V:values:1',
+      \ 'v:variables:1'
+    \ ]
+\ }
+
+let g:tagbar_type_go = {
+    \ 'ctagstype': 'go',
+    \ 'kinds' : [
+        \'p:package',
+        \'f:function',
+        \'v:variables',
+        \'t:type',
+        \'c:const'
+    \]
+\}
+
+let g:tagbar_type_d = {
+            \ 'ctagstype' : 'd',
+            \ 'kinds'     : [
+            \ 'c:classes:1:1',
+            \ 'f:functions:1:1',
+            \ 'T:template:1:1',
+            \ 'g:enums:1:1',
+            \ 'e:enumerators:0:0',
+            \ 'u:unions:1:1',
+            \ 's:structs:1:1',
+            \ 'v:variables:1:0',
+            \ 'i:interfaces:1:1',
+            \ 'm:members',
+            \ 'a:alias'
+            \ ],
+            \'sro': '.',
+            \ 'kind2scope' : {
+            \ 'c' : 'class',
+            \ 'g' : 'enum',
+            \ 's' : 'struct',
+            \ 'u' : 'union',
+            \ 'T' : 'template'
+            \},
+            \ 'scope2kind' : {
+            \ 'enum'      : 'g',
+            \ 'class'     : 'c',
+            \ 'struct'    : 's',
+            \ 'union'     : 'u',
+            \ 'template'  : 'T'
+            \ },
+            \ 'ctagsbin' : 'dscanner',
+            \ 'ctagsargs' : ['--ctags']
+            \ }
+
+let g:tagbar_type_markdown = {
+    \ 'ctagstype' : 'markdown',
+    \ 'kinds' : [
+        \ 'h:Heading_L1',
+        \ 'i:Heading_L2',
+        \ 'k:Heading_L3'
+    \ ]
+\ }
+
+" add a definition for Objective-C to tagbar
+let g:tagbar_type_objc = {
+    \ 'ctagstype' : 'ObjectiveC',
+    \ 'kinds'     : [
+        \ 'i:interface',
+        \ 'I:implementation',
+        \ 'p:Protocol',
+        \ 'm:Object_method',
+        \ 'c:Class_method',
+        \ 'v:Global_variable',
+        \ 'F:Object field',
+        \ 'f:function',
+        \ 'p:property',
+        \ 't:type_alias',
+        \ 's:type_structure',
+        \ 'e:enumeration',
+        \ 'M:preprocessor_macro',
+    \ ],
+    \ 'sro'        : ' ',
+    \ 'kind2scope' : {
+        \ 'i' : 'interface',
+        \ 'I' : 'implementation',
+        \ 'p' : 'Protocol',
+        \ 's' : 'type_structure',
+        \ 'e' : 'enumeration'
+    \ },
+    \ 'scope2kind' : {
+        \ 'interface'      : 'i',
+        \ 'implementation' : 'I',
+        \ 'Protocol'       : 'p',
+        \ 'type_structure' : 's',
+        \ 'enumeration'    : 'e'
+    \ }
+\ }
+
+let g:tagbar_type_rust = {
+    \ 'ctagstype' : 'rust',
+    \ 'kinds' : [
+        \'T:types,type definitions',
+        \'f:functions,function definitions',
+        \'g:enum,enumeration names',
+        \'s:structure names',
+        \'m:modules,module names',
+        \'c:consts,static constants',
+        \'t:traits,traits',
+        \'i:impls,trait implementations',
+    \]
+    \}
 
 " NERDTree
 let g:NERDTreeWinPos="right"
@@ -200,7 +314,7 @@ let g:NERDTreeIgnore=['\.o$', '\~$', '\.a$', '\.swp$', '\.so$', '\.b$', '\.bak$'
 let g:NERDChristmasTree=1
 let g:NERDTreeAutoCenter=1
 let g:NERDTreeQuitOnOpen=1
-map <silent> <leader>ff :NERDTreeToggle<CR>
+map <silent> <leader>t :NERDTreeToggle<CR>
 
 " cscope
 if has("cscope")
