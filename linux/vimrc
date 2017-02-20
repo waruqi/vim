@@ -330,6 +330,8 @@ if has("cscope")
 	endif
 	set csverb
 endif
+map <silent> <leader>g <C-]>
+map <silent> <leader>r <C-t><CR>
 
 " ShowMarks
 let showmarks_enable = 1
