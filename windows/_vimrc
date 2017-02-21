@@ -89,55 +89,22 @@ set number
 "当右键单击窗口的时候， 弹出快捷菜单
 :set mousemodel=popup
 
-"自动换行
-if (has("gui_running"))	"图形界面下的设置
-
-"指定不折行。如果一行太长，超过屏幕宽度，则向右边延伸到屏幕外面
+" nowrap
 :set nowrap
-"添加水平滚动条。如果你指定了不折行，那为窗口添加一个水平滚动条就非常有必要了
+if (has("gui_running"))	
+
+" add scroll bar
 :set guioptions+=b
 
-else	"字符界面下的设置
-   set wrap
 endif
-
 
 """"""""""""""""""""""""""""""""""""""
 " 快捷键设置
 """"""""""""""""""""""""""""""""""""""
-"<F1>菜单栏与工具栏隐藏与显示动态切换
-set guioptions-=m
-set guioptions+=T
-map <silent> <F1> :if &guioptions =~# 'm' <Bar>
-        \set guioptions-=m <Bar>
-    \else <Bar>
-        \set guioptions+=m <Bar>
-    \endif<CR>
-
-"<F2>code_complete.vim插件：函数自动完成
-"if !exists("g:completekey")
-"    let g:completekey = "<F2>"   "hotkey
-"endif
-
-" 单词翻译
-map <F3> :!sdcv -n <C-R>=expand("<cword>")<CR><CR>
-
 " 替换所有tab到空格
 map <F4> :%retab!<CR>
 
-"符号浏览窗口
-map <F5> :SrcExplToggle<CR><CR>
-
-"生成doxygen接口注释
-let g:DoxygenToolkit_authorName="ruki"
-map <F7> :Dox<CR>
-
-"统计行数
-map <F8> :!wc -l `find ./ -name "*.c"`
-
 "映射复制、粘贴、剪贴ctrl+c ctrl+v ctrl+x
-":map <C-V> "+pa<Esc>
-":map! <C-V> <Esc>"+pa
 :map <C-C> "+y
 :map <C-X> "+x
 :map <C-Z> "+u
