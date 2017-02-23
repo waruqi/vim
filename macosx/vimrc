@@ -98,24 +98,34 @@ endif
 """"""""""""""""""""""""""""""""""""""
 " 快捷键设置
 """"""""""""""""""""""""""""""""""""""
-" 替换所有tab到空格
+" replace tab to spaces
 map <F4> :%retab!<CR>
-
-"映射复制、粘贴、剪贴ctrl+c ctrl+v ctrl+x
-:map <C-C> "+y
-:map <C-X> "+x
-:map <C-Z> "+u
-" Paste from clipboard when in insert mode.
-imap <C-V> <ESC>"+gpa
-" Paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
-vmap <C-V> "+gp
 
 " fix paste bug for vim + tmux
 set clipboard=unnamed
 
-" 映射全选 ctrl+a
+" copy, paste and cute: ctrl+c ctrl+v ctrl+x
+:map <C-C> "+y
+:map <C-X> "+x
+:map <C-Z> "+u
+
+" paste from clipboard when in insert mode.
+imap <C-V> <ESC>"+gpa
+" paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
+vmap <C-V> "+gp
+
+" select all: ctrl+a
 :map <C-A> ggVG
 :map! <C-A> <Esc>ggVG
+
+" delete and backspace
+vnoremap <BS> "_d
+nnoremap <BS> "_d
+vnoremap <Del> "_d
+nnoremap <Del> "_d
+
+" redo
+:nmap r <c-r>
 
 " 多行缩进
 :map <Tab> >
@@ -355,6 +365,8 @@ set nrformats=
 
 " wildfire (smart selection)
 let g:wildfire_objects = ["iw", "i'", 'i"', "i)", "i]", "i}", "ip", "it"]
+let g:wildfire_fuel_map = "<Enter>"
+let g:wildfire_water_map = "<Space>"
 
 """"""""""""""""""""""""""""""""""""""
 " 其他设置
