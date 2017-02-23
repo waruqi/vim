@@ -102,14 +102,14 @@ endif
 map <F4> :%retab!<CR>
 
 " copy, paste and cute: ctrl+c ctrl+v ctrl+x
-:map <C-C> "+y
-:map <C-X> "+x
-:map <C-Z> "+u
+:map <C-C> y
+:map <C-X> x
+:map <C-Z> u
 
 " paste from clipboard when in insert mode.
-imap <C-V> <ESC>"+gpa
+imap <C-V> <ESC>gpa
 " paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
-vmap <C-V> "+gp
+vmap <C-V> gp
 
 " select all: ctrl+a
 :map <C-A> ggVG
