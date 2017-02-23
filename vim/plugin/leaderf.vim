@@ -97,7 +97,7 @@ call s:InitVar('g:Lf_HighlightIndividual', 1)
 call s:InitVar('g:Lf_NumberOfHighlight', 100)
 call s:InitVar('g:Lf_WildIgnore',{
             \ 'dir': ['.svn','.git', '.gradle', '.xmake', 'pkg', 'build', 'bin'],
-            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]', '.DS_Store', '*.a', '*.lib', '*.obj', '*.pdb', '*.dep', '*.jar', '*.d', '*.class', '*.bin', '*.lock', '*.png', '*.jpg', '*.gif']
+            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]', '.DS_Store', '*.a', '*.lib', '*.obj', '*.pdb', '*.dep', '*.jar', '*.class', '*.bin', '*.lock', '*.png', '*.jpg', '*.gif']
             \})
 call s:InitVar('g:Lf_StlSeparator',{
             \ 'left': '►',
