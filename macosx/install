@@ -7,3 +7,4 @@ rm -rf ~/.stardict/
 mkdir ~/.stardict/
 cp -r ../dic ~/.stardict/
 cp ../ctags ~/.ctags
+cp ../markdown2ctags.py ~/.vim/
