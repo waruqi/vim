@@ -290,6 +290,16 @@ let g:tagbar_type_rust = {
     \}
 
 
+let g:tagbar_type_mql4 = {
+    \ 'ctagstype': 'C++',
+    \ 'kinds' : [
+        \'f:function',
+        \'v:variables',
+        \'t:type',
+        \'c:const'
+    \]
+\}
+
 " NERDTree
 let g:NERDTreeWinPos="right"
 let g:NERDTreeIgnore=['\.o$', '\~$', '\.a$', '\.swp$', '\.so$', '\.b$', '\.bak$', '\.out$']
