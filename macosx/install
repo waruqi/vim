@@ -1,6 +1,7 @@
 #sbin/bash
 rm -f ~/.vimrc
 rm -rf ~/.vim
+rm -rf ~/.config/nvim
 cp ./vimrc ~/.vimrc
 cp -r ../vim ~/.vim
 rm -rf ~/.stardict/
@@ -8,4 +9,35 @@ mkdir ~/.stardict/
 cp -r ../dic ~/.stardict/
 cp ../ctags ~/.ctags
 cp ../markdown2ctags.py ~/.vim/
+ln -s ~/.vim ~/.config/nvim
+ln -s ~/.vimrc ~/.config/nvim/init.vim
+
+# install leaderf
+cd ~/.vim/autoload/leaderf/fuzzyMatch_C
+echo "Begin to compile C extension of Python2 ..."
+python setup.py build
+if (( $? == 0 ))
+then
+    cp build/lib*2.?/fuzzyMatchC*.so ../python
+    if (( $? == 0 ))
+    then
+        echo
+        echo C extension of Python2 installed sucessfully!
+    fi
+fi
+
+echo
+echo "Begin to compile C extension of Python3 ..."
+python3 setup.py build
+if (( $? == 0 ))
+then
+    cp build/lib*3.?/fuzzyMatchC*.so ../python
+    if (( $? == 0 ))
+    then
+        echo
+        echo C extension of Python3 installed sucessfully!
+    fi
+fi
+cd -
+
 brew install dscanner

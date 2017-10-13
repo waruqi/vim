@@ -4,93 +4,57 @@
 " Author:      Yggdroot <archofortune@gmail.com>
 " Website:     https://github.com/Yggdroot
 " Note:
-" License:     This script is released under the Vim License.
+" License:     Apache License, Version 2.0
 " ============================================================================
 
-exec g:Lf_py "import vim, sys"
+exec g:Lf_py "import vim, sys, os.path"
 exec g:Lf_py "cwd = vim.eval('expand(\"<sfile>:p:h\")')"
-exec g:Lf_py "sys.path.insert(0, cwd)"
-exec g:Lf_py "from leaderf.bufExpl import *"
-exec g:Lf_py "from leaderf.fileExpl import *"
-exec g:Lf_py "from leaderf.mruExpl import *"
+exec g:Lf_py "sys.path.insert(0, os.path.join(cwd, 'leaderf', 'python'))"
 
-
-function! leaderf#fileExplMaps()
-    nmapclear <buffer>
-    nnoremap <buffer> <silent> <CR>          :exec g:Lf_py "fileExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> o             :exec g:Lf_py "fileExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> <2-LeftMouse> :exec g:Lf_py "fileExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> x             :exec g:Lf_py "fileExplManager.accept('h')"<CR>
-    nnoremap <buffer> <silent> v             :exec g:Lf_py "fileExplManager.accept('v')"<CR>
-    nnoremap <buffer> <silent> t             :exec g:Lf_py "fileExplManager.accept('t')"<CR>
-    nnoremap <buffer> <silent> q             :exec g:Lf_py "fileExplManager.quit()"<CR>
-    nnoremap <buffer> <silent> i             :exec g:Lf_py "fileExplManager.input()"<CR>
-    nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "fileExplManager.toggleHelp()"<CR>
-    nnoremap <buffer> <silent> <F5>          :exec g:Lf_py "fileExplManager.refresh()"<CR>
-    nnoremap <buffer> <silent> s             :exec g:Lf_py "fileExplManager.addSelections()"<CR>
-    nnoremap <buffer> <silent> a             :exec g:Lf_py "fileExplManager.selectAll()"<CR>
-    nnoremap <buffer> <silent> c             :exec g:Lf_py "fileExplManager.clearSelections()"<CR>
-endfunction
-
-function! leaderf#bufExplMaps()
-    nmapclear <buffer>
-    nnoremap <buffer> <silent> <CR>          :exec g:Lf_py "bufExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> o             :exec g:Lf_py "bufExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> <2-LeftMouse> :exec g:Lf_py "bufExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> x             :exec g:Lf_py "bufExplManager.accept('h')"<CR>
-    nnoremap <buffer> <silent> v             :exec g:Lf_py "bufExplManager.accept('v')"<CR>
-    nnoremap <buffer> <silent> t             :exec g:Lf_py "bufExplManager.accept('t')"<CR>
-    nnoremap <buffer> <silent> q             :exec g:Lf_py "bufExplManager.quit()"<CR>
-    nnoremap <buffer> <silent> i             :exec g:Lf_py "bufExplManager.input()"<CR>
-    nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "bufExplManager.toggleHelp()"<CR>
-    nnoremap <buffer> <silent> d             :exec g:Lf_py "bufExplManager.deleteBuffer(1)"<CR>
-    nnoremap <buffer> <silent> D             :exec g:Lf_py "bufExplManager.deleteBuffer()"<CR>
-endfunction
-
-function! leaderf#mruExplMaps()
-    nmapclear <buffer>
-    nnoremap <buffer> <silent> <CR>          :exec g:Lf_py "mruExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> o             :exec g:Lf_py "mruExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> <2-LeftMouse> :exec g:Lf_py "mruExplManager.accept()"<CR>
-    nnoremap <buffer> <silent> x             :exec g:Lf_py "mruExplManager.accept('h')"<CR>
-    nnoremap <buffer> <silent> v             :exec g:Lf_py "mruExplManager.accept('v')"<CR>
-    nnoremap <buffer> <silent> t             :exec g:Lf_py "mruExplManager.accept('t')"<CR>
-    nnoremap <buffer> <silent> q             :exec g:Lf_py "mruExplManager.quit()"<CR>
-    nnoremap <buffer> <silent> i             :exec g:Lf_py "mruExplManager.input()"<CR>
-    nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "mruExplManager.toggleHelp()"<CR>
-    nnoremap <buffer> <silent> d             :exec g:Lf_py "mruExplManager.deleteMru()"<CR>
-    nnoremap <buffer> <silent> s             :exec g:Lf_py "mruExplManager.addSelections()"<CR>
-    nnoremap <buffer> <silent> a             :exec g:Lf_py "mruExplManager.selectAll()"<CR>
-    nnoremap <buffer> <silent> c             :exec g:Lf_py "mruExplManager.clearSelections()"<CR>
+function! leaderf#versionCheck()
+    if g:Lf_PythonVersion == 2 && pyeval("sys.version_info < (2, 7)")
+        echohl Error
+        echo "Error: LeaderF requires python2.7+, your current version is " . pyeval("sys.version")
+        echohl None
+        return 0
+    elseif g:Lf_PythonVersion == 3 && py3eval("sys.version_info < (3, 1)")
+        echohl Error
+        echo "Error: LeaderF requires python3.1+, your current version is " . pyeval("sys.version")
+        echohl None
+        return 0
+    elseif g:Lf_PythonVersion != 2 && g:Lf_PythonVersion != 3
+        echohl Error
+        echo "Error: Invalid value of `g:Lf_PythonVersion`, value must be 2 or 3."
+        echohl None
+        return 0
+    endif
+    return 1
 endfunction
 
 function! leaderf#LfPy(cmd)
     exec g:Lf_py . a:cmd
 endfunction
 
-function! leaderf#startFileExpl(win_pos, ...)
-    if a:0 == 0
-        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."')")
-    else
-        let dir = fnamemodify(a:1.'/',":h:gs?\\?/?")
-        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."','".dir."')")
+function! leaderf#removeCache(bufNum)
+    if exists("g:Lf_bufTagExpl_loaded")
+        call leaderf#BufTag#removeCache(a:bufNum)
+    endif
+
+    if exists("g:Lf_functionExpl_loaded")
+        call leaderf#Function#removeCache(a:bufNum)
     endif
 endfunction
 
-function! leaderf#startBufExpl(win_pos, ...)
-    if a:0 == 0
-        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."')")
-    else
-        let arg = a:1 == 0 ? 'False' : 'True'
-        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."',".arg.")")
+function! leaderf#cleanup()
+    if exists("g:Lf_fileExpl_loaded")
+        call leaderf#File#cleanup()
+    endif
+
+    if exists("g:Lf_bufTagExpl_loaded")
+        call leaderf#BufTag#cleanup()
+    endif
+
+    if exists("g:Lf_functionExpl_loaded")
+        call leaderf#Function#cleanup()
     endif
 endfunction
-
-function! leaderf#startMruExpl(win_pos, ...)
-    if a:0 == 0
-        call leaderf#LfPy("mruExplManager.startExplorer('".a:win_pos."',"."vim.current.buffer.name)")
-    else
-        call leaderf#LfPy("mruExplManager.startExplorer('".a:win_pos."',"."vim.current.buffer.name, f='cwd')")
-    endif
-endfunction
-

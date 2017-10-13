@@ -1,15 +1,16 @@
 " ============================================================================
-" File:        mru.vim
+" File:        lfMru.vim
 " Description:
 " Author:      Yggdroot <archofortune@gmail.com>
 " Website:     https://github.com/Yggdroot
 " Note:
-" License:     This script is released under the Vim License.
+" License:     Apache License, Version 2.0
 " ============================================================================
 
-exec g:Lf_py "import vim, sys"
-exec g:Lf_py "cwd = vim.eval('expand(\"<sfile>:p:h\")')"
-exec g:Lf_py "sys.path.insert(0, cwd)"
+if leaderf#versionCheck() == 0  " this check is necessary
+    finish
+endif
+
 exec g:Lf_py "from leaderf.mru import *"
 
 function! lfMru#record(name)

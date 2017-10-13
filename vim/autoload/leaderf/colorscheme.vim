@@ -4,7 +4,7 @@
 " Author:      Yggdroot <archofortune@gmail.com>
 " Website:     https://github.com/Yggdroot
 " Note:
-" License:     Apache-2.0
+" License:     Apache License, Version 2.0
 " ============================================================================
 
 function! leaderf#colorscheme#mergePalette(palette)
@@ -68,9 +68,14 @@ function! leaderf#colorscheme#highlight(category)
         try
             let s:palette = g:leaderf#colorscheme#{g:colors_name}#palette
         catch /^Vim\%((\a\+)\)\=:E121/
-            echohl WarningMsg
-            echo "Could not load colorscheme '".g:colors_name."', use 'default'."
-            echohl None
+            "echohl WarningMsg
+            "try
+            "    echo "Could not load colorscheme '".g:colors_name."', use 'default'."
+            "catch /^Vim\%((\a\+)\)\=:E121/
+            "    echo "Could not load colorscheme, use 'default'."
+            "    let g:colors_name = "default"
+            "endtry
+            "echohl None
 
             let s:palette = g:leaderf#colorscheme#default#palette
         endtry

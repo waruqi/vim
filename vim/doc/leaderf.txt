@@ -1,4 +1,4 @@
-*leaderf.txt*   Quickly locate files, buffers, mrus, ... in large project.
+*leaderf.txt*   Quickly locate files, buffers, mrus, tags, ... in large project.
 *leaderf* *LeaderF*
 ==============================================================================
 /      '7MMF'                            '7MM                `7MM"""YMM      /
@@ -21,19 +21,19 @@ Credits                                         |leaderf-credits|
 ==============================================================================
 INTRODUCTION                                    *leaderf-introduction*
 
-This plugin is mainly used for locating files, buffers, mrus in large project.
+This plugin is mainly used for locating files, buffers, mrus, tags in large project.
 
 - Written in Python.
-- Support for fuzzy and regex searching.
+- Support fuzzy and regex searching.
 - Manage buffers and mrus.
 - Open multiple files at once.
 - Extensible.
 ==============================================================================
 REQUIREMENTS                                    *leaderf-requirements*
 
-- vim7.0 or higher.
-- vim compiled with Python support, you can check by using echo has('python')
-  or echo has('python3') to see if the result is 1.
+- vim7.4.330 or higher.
+- vim compiled with Python support, you can check by using `echo has('python')`
+  or `echo has('python3')` to see if the result is 1.
 ==============================================================================
 OPTIONS                                         *leaderf-options*
 
@@ -91,7 +91,7 @@ g:Lf_ShowRelativePath                           *g:Lf_ShowRelativePath*
 
 g:Lf_DefaultMode                                *g:Lf_DefaultMode*
     Specify the default mode when LeaderF is launched.
-    There are 3 modes, and the corresponding values are:
+    There are 4 modes, and the corresponding values are:
     'NameOnly' - fuzzy mode, match file name only when searching
     'FullPath' - fuzzy mode, match full path when searching
     'Fuzzy' - fuzzy mode, when lines in the result are not file path
@@ -115,7 +115,7 @@ g:Lf_NeedCacheTime                              *g:Lf_NeedCacheTime*
     Default value is 1.5 seconds.
 
 g:Lf_NumberOfCache                              *g:Lf_NumberOfCache*
-    This option specify the number of cache.
+    This option specifies the number of cache.
     Default value is 5.
 
 g:Lf_UseMemoryCache                             *g:Lf_UseMemoryCache*
@@ -139,7 +139,7 @@ g:Lf_WildIgnore                                 *g:Lf_WildIgnore*
     Specify the files and directories you want to exclude while indexing.
     Default value is: >
     let g:Lf_WildIgnore = {
-            \ 'dir': ['.svn','.git'],
+            \ 'dir': ['.svn','.git','.hg'],
             \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]']
             \}
 <
@@ -186,7 +186,7 @@ g:Lf_StlColorscheme                             *g:Lf_StlColorscheme*
     let g:Lf_StlColorscheme = 'powerline'
 <
     The colorscheme files can be found in the directory >
-	"LeaderF/autoload/leaderf/colorscheme/"
+    "LeaderF/autoload/leaderf/colorscheme/"
 <
     Default value is 'default'.
 
@@ -223,7 +223,7 @@ g:Lf_StlSeparator                               *g:Lf_StlSeparator*
     let g:Lf_StlSeparator = { 'left': "\u2b80", 'right': "\u2b82" }
 <
 g:Lf_StlPalette                                 *g:Lf_StlPalette*
-    This is a directory, you can customize the colorscheme using this option.
+    This is a dictionary, you can customize the colorscheme using this option.
     Default colorscheme is equivalent to the following setting: >
     let g:Lf_StlPalette = {
             \   'stlName': {
@@ -338,6 +338,105 @@ g:Lf_StlPalette                                 *g:Lf_StlPalette*
             \       'guibg': '#BAFFA3'
             \ }
 <
+g:Lf_Ctags                                      *g:Lf_Ctags*
+    Use this option to specify the ctags executable you use. If ctags is not
+    in one of the directories in your $PATH environment variable, you should
+    set it by yourself. e.g., >
+    let g:Lf_Ctags = "/usr/local/universal-ctags/ctags"
+<
+    Default value is "ctags".
+
+g:Lf_PreviewCode                                *g:Lf_PreviewCode*
+    Use this option to specify whether to show the preview of the code the tag
+    locates in when navigating the tags.
+
+    Default value is 0.
+
+g:Lf_DefaultExternalTool                        *g:Lf_DefaultExternalTool*
+    Use this option to specify the default external tool which is used to
+    index the files. Possible values are 'rg', 'pt'(not available on Windows),
+    'ag', 'find'.  If you do not want to use the external tool: >
+    let g:Lf_DefaultExternalTool = ""
+<
+    By default, use the external tool in the sequence of 'rg', 'pt', 'ag', 'find'
+    if one is available. If none of the tools are available, falls back to the
+    build-in python implementation which is a little slower.
+
+g:Lf_UseVersionControlTool                      *g:Lf_UseVersionControlTool*
+    This option specifies whether to use version control tool to index the
+    files when inside a repository under control. If not a version control
+    repository or value is 0, falls back to |g:Lf_DefaultExternalTool|.
+    e.g.
+    use command `git ls-files` for git repository;
+    use command `hg files` for hg repository.
+    Note: |g:Lf_WildIgnore| is ignored when using these commands.
+
+    Default value is 1.
+
+g:Lf_ExternalCommand                            *g:Lf_ExternalCommand*
+    Use this option to specify a external command to index the files. If not
+    specified, falls back to |g:Lf_UseVersionControlTool|.
+
+    Use "%s"(quotes are necessary for directory name with space in it) as the
+    placeholder of the start directory.
+    e.g. >
+    let g:Lf_ExternalCommand = 'dir "%s" /s/b/a-d-h-s'       " On Windows
+    let g:Lf_ExternalCommand = 'find "%s" -type f'           " On MacOSX/Linux
+<
+    Note: |g:Lf_UseVersionControlTool| and |g:Lf_DefaultExternalTool| are
+    ignored if this option is specified.
+
+g:Lf_PreviewResult                              *g:Lf_PreviewResult*
+    This is a dictionary, indicates whether to enable the preview of the result.
+    Default value is: >
+    let g:Lf_PreviewResult = {
+            \ 'File': 0,
+            \ 'Buffer': 0,
+            \ 'Mru': 0,
+            \ 'Tag': 0,
+            \ 'BufTag': 1,
+            \ 'Function': 1,
+            \ 'Line': 0,
+            \ 'Colorscheme': 0
+            \}
+<
+    e.g., if you want to disable the preview of BufTag explorer: >
+    let g:Lf_PreviewResult = { 'BufTag': 0 }
+<
+g:Lf_RememberLastSearch                         *g:Lf_RememberLastSearch*
+    This option specifies whether to remember the last search. If the value is
+    1, the search string you typed during last search is still there when
+    LeaderF is launched again. (Introduced in issue #62)
+
+    Default value is 0.
+
+g:Lf_UseCache                                   *g:Lf_UseCache*
+    This option specifies whether to cache the files list. If the value is 1,
+    LeaderF won't reindex the files when reopen vim.(Introduced in issue #64)
+
+    Default value is 1.
+
+g:Lf_NormalMap                                  *g:Lf_NormalMap*
+    Use this option to customize the mappings in normal mode.
+    e.g., >
+    let g:Lf_NormalMap = {
+        \ "File":   [["<ESC>", ':exec g:Lf_py "fileExplManager.quit()"<CR>'],
+        \            ["<F6>", ':exec g:Lf_py "fileExplManager.quit()"<CR>']
+        \           ],
+        \ "Buffer": [["<ESC>", ':exec g:Lf_py "bufExplManager.quit()"<CR>'],
+        \            ["<F6>", ':exec g:Lf_py "bufExplManager.quit()"<CR>']
+        \           ],
+        \ "Mru":    [["<ESC>", ':exec g:Lf_py "mruExplManager.quit()"<CR>']],
+        \ "Tag":    [],
+        \ "BufTag": [],
+        \ "Function": [],
+        \ "Line":   [],
+        \ "History":[],
+        \ "Help":   [],
+        \ "Self":   [],
+        \ "Colorscheme": []
+        \}
+<
 g:Lf_CommandMap                                 *g:Lf_CommandMap*
     Use this option to customize the mappings inside LeaderF's
     prompt(|leaderf-prompt|).
@@ -348,10 +447,10 @@ g:Lf_CommandMap                                 *g:Lf_CommandMap*
 ==============================================================================
 USAGE                                           *leaderf-usage*
 
-:Leaderf [directory] or ,f                      *Leaderf*
+:LeaderfFile [directory] or |<leader>|f           *LeaderfFile*
     Launch LeaderF to search files.
 
-:LeaderfBuffer or ,b                            *LeaderfBuffer*
+:LeaderfBuffer or |<leader>|b                     *LeaderfBuffer*
     Launch LeaderF to search buffers.
 
 :LeaderfBufferAll                               *LeaderfBufferAll*
@@ -362,6 +461,42 @@ USAGE                                           *leaderf-usage*
 
 :LeaderfMruCwd                                  *LeaderfMruCwd*
     Launch LeaderF to search Mru in current working directory.
+
+:LeaderfTag                                     *LeaderfTag*
+    Launch LeaderF to navigate tags.
+
+:LeaderfBufTag                                  *LeaderfBufTag*
+    Launch LeaderF to navigate tags in current buffer.
+
+:LeaderfBufTagAll                               *LeaderfBufTagAll*
+    Launch LeaderF to navigate tags in all listed buffers.
+
+:LeaderfFunction                                *LeaderfFunction*
+    Launch LeaderF to navigate functions or methods in current buffer.
+
+:LeaderfFunctionAll                             *LeaderfFunctionAll*
+    Launch LeaderF to navigate functions or methods in all listed buffers.
+
+:LeaderfLine                                    *LeaderfLine*
+    Launch LeaderF to search a line in current buffer.
+
+:LeaderfLineAll                                 *LeaderfLineAll*
+    Launch LeaderF to search a line in all listed buffers.
+
+:LeaderfHistoryCmd                              *LeaderfHistoryCmd*
+    Launch LeaderF to execute the command in the history.
+
+:LeaderfHistorySearch                           *LeaderfHistorySearch*
+    Launch LeaderF to execute the search command in the history.
+
+:LeaderfSelf                                    *LeaderfSelf*
+    Launch LeaderF to execute the commands of itself.
+
+:LeaderfHelp                                    *LeaderfHelp*
+    Launch LeaderF to navigate the help tags.
+
+:LeaderfColorscheme                             *LeaderfColorscheme*
+    Launch LeaderF to switch between colorschemes.
 
 Once LeaderF is launched:                       *prompt* *leaderf-prompt*
     <C-C> : quit from LeaderF.
@@ -387,6 +522,7 @@ Once LeaderF is launched:                       *prompt* *leaderf-prompt*
     <End> : move the cursor to the end of the prompt.
     <Left>: move the cursor one character to the left.
     <Right> : move the cursor one character to the right.
+    <C-P> : preview the result.
 ==============================================================================
 FAQ                                             *leaderf-faq*
 
