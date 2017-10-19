@@ -399,7 +399,7 @@ let g:wildfire_water_map = "<Space>"
 
 " terminal
 if has('nvim')
-    map <silent> <leader>- :bo sp term://bash\|resize 12<CR>
-    map <silent> <leader>= :vs\|te<CR>
+    map <silent> <leader>- :bo split term\|resize 12<CR>
+    map <silent> <leader>= :vertical rightbelow split\|term<CR>
 endif
 
