@@ -393,3 +393,13 @@ let g:wildfire_water_map = "<Space>"
 "去掉讨厌的有关vi一致性模式，避免以前版本的一些bug和局限
 :set nocompatible
 
+""""""""""""""""""""""""""""""""""""""
+" neovim
+""""""""""""""""""""""""""""""""""""""
+
+" terminal
+if has('nvim')
+    map <silent> <leader>- :bo sp term://bash\|resize 12<CR>
+    map <silent> <leader>= :vs\|te<CR>
+endif
+
