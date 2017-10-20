@@ -2153,7 +2153,8 @@ function! s:CloseWindow() abort
     " The window sizes may have changed due to the shrinking happening after
     " the window closing, so equalize them again.
     if &equalalways
-        wincmd =
+        " TODO will modify windows size, need fix it
+        " wincmd =
     endif
 
     if s:autocommands_done && !s:statusline_in_use
