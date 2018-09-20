@@ -4,6 +4,7 @@
 import vim
 import re
 import os
+import sys
 import os.path
 import subprocess
 import tempfile
@@ -27,7 +28,7 @@ class BufTagExplorer(Explorer):
         self._executor = []
 
     def getContent(self, *args, **kwargs):
-        if len(args) > 0: # all buffers
+        if "--all" in kwargs.get("arguments", {}): # all buffers
             cur_buffer = vim.current.buffer
             for b in vim.buffers:
                 if b.options["buflisted"]:
@@ -47,10 +48,16 @@ class BufTagExplorer(Explorer):
             return itertools.chain.from_iterable(self._getTagList())
         else:
             result = self._getTagResult(vim.current.buffer)
-            if isinstance(result, list):
-                return result
-            else:
-                return self._formatResult(*result)
+            if not isinstance(result, list):
+                result = self._formatResult(*result)
+            tag_list = []
+            for i, line in enumerate(result):
+                if self._supports_preview and i & 1:
+                    tag_list.append(line)
+                else:
+                    first, second = line.rsplit(":", 1)
+                    tag_list.append("{}\t  :{}".format(first.rsplit("\t", 1)[0], second))
+            return tag_list
 
     def _getTagList(self):
         buffers = [b for b in vim.buffers]
@@ -89,15 +96,20 @@ class BufTagExplorer(Explorer):
             extra_options = "--c++-kinds=+p"
         elif lfEval("getbufvar(%d, '&filetype')" % buffer.number) == "c":
             extra_options = "--c-kinds=+p"
+        elif lfEval("getbufvar(%d, '&filetype')" % buffer.number) == "python":
+            extra_options = "--language-force=Python"
         else:
             extra_options = ""
 
         executor = AsyncExecutor()
         self._executor.append(executor)
         if buffer.options["modified"] == True:
-            with tempfile.NamedTemporaryFile(mode='w+',
-                                             suffix='_'+os.path.basename(buffer.name),
-                                             delete=False) as f:
+            if sys.version_info >= (3, 0):
+                tmp_file = partial(tempfile.NamedTemporaryFile, encoding=lfEval("&encoding"))
+            else:
+                tmp_file = tempfile.NamedTemporaryFile
+
+            with tmp_file(mode='w+', suffix='_'+os.path.basename(buffer.name), delete=False) as f:
                 for line in buffer[:]:
                     f.write(line + '\n')
                 file_name = f.name
@@ -126,13 +138,17 @@ class BufTagExplorer(Explorer):
 
         tag_total_len = 0
         max_kind_len = 0
+        max_tag_len = 0
         for _, item  in enumerate(output):
-            tag_total_len += len(item[0])
+            tag_len = len(item[0])
+            tag_total_len += tag_len
+            if tag_len > max_tag_len:
+                max_tag_len = tag_len
             kind_len = len(item[3])
             if kind_len > max_kind_len:
                 max_kind_len = kind_len
         ave_taglen = tag_total_len // len(output)
-        tag_len = ave_taglen * 3 // 2
+        tag_len = min(max_tag_len, ave_taglen * 2)
 
         tab_len = buffer.options["shiftwidth"]
         std_tag_kind_len = tag_len // tab_len * tab_len + tab_len + max_kind_len
@@ -175,9 +191,6 @@ class BufTagExplorer(Explorer):
     def getStlCurDir(self):
         return escQuote(lfEncode(os.getcwd()))
 
-    def isFilePath(self):
-        return False
-
     def removeCache(self, buf_number):
         if buf_number in self._tag_list:
             del self._tag_list[buf_number]
@@ -206,12 +219,17 @@ class BufTagExplManager(Manager):
 
     def _defineMaps(self):
         lfCmd("call leaderf#BufTag#Maps()")
+        lfCmd("augroup Lf_BufTag")
+        lfCmd("autocmd!")
+        lfCmd("autocmd BufWipeout * call leaderf#BufTag#removeCache(expand('<abuf>'))")
+        lfCmd("autocmd VimLeavePre * call leaderf#BufTag#cleanup()")
+        lfCmd("augroup END")
 
     def _acceptSelection(self, *args, **kwargs):
         if len(args) == 0:
             return
         line = args[0]
-        if line[0].isspace():
+        if line[0].isspace(): # if g:Lf_PreviewCode == 1
             buffer = args[1]
             line_nr = args[2]
             line = buffer[line_nr - 2]
@@ -225,7 +243,7 @@ class BufTagExplManager(Manager):
             lfCmd("norm! ^")
             lfCmd("call search('\V%s', 'Wc', line('.'))" % escQuote(tagname))
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 100m | setlocal cursorline!")
+        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
 
     def _getDigest(self, line, mode):
         """
@@ -263,8 +281,9 @@ class BufTagExplManager(Manager):
         help.append('" x : open file under cursor in a horizontally split window')
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
-        help.append('" i : switch to input mode')
-        help.append('" q : quit')
+        help.append('" i/<Tab> : switch to input mode')
+        help.append('" p : preview the result')
+        help.append('" q/<Esc> : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -332,20 +351,23 @@ class BufTagExplManager(Manager):
                                                                 iterable)
 
     def _regexFilter(self, iterable):
-        try:
-            if ('-2' == lfEval("g:LfNoErrMsgMatch('', '%s')" % escQuote(self._cli.pattern))):
+        if self._supports_preview:
+            try:
+                if ('-2' == lfEval("g:LfNoErrMsgMatch('', '%s')" % escQuote(self._cli.pattern))):
+                    return iter([])
+                else:
+                    result = []
+                    for i, line in enumerate(iterable[::2]):
+                        if ('-1' != lfEval("g:LfNoErrMsgMatch('%s', '%s')" %
+                            (escQuote(self._getDigest(line, 1).strip()),
+                                escQuote(self._cli.pattern)))):
+                            result.append(line)
+                            result.append(iterable[2*i+1])
+                    return result
+            except vim.error:
                 return iter([])
-            else:
-                result = []
-                for i, line in enumerate(iterable[::2]):
-                    if ('-1' != lfEval("g:LfNoErrMsgMatch('%s', '%s')" %
-                        (escQuote(self._getDigest(line, 1).strip()),
-                            escQuote(self._cli.pattern)))):
-                        result.append(line)
-                        result.append(iterable[2*i+1])
-                return result
-        except vim.error:
-            return iter([])
+        else:
+            return super(BufTagExplManager, self)._regexFilter(iterable)
 
     def _getList(self, pairs):
         """
@@ -388,13 +410,39 @@ class BufTagExplManager(Manager):
         line_nr = self._getInstance().window.cursor[0]
 
         saved_eventignore = vim.options['eventignore']
-        vim.options['eventignore'] = 'all'
+        vim.options['eventignore'] = 'BufLeave,WinEnter,BufEnter'
         try:
             vim.current.tabpage, vim.current.window, vim.current.buffer = orig_pos
             self._acceptSelection(line, self._getInstance().buffer, line_nr, preview=True)
         finally:
             vim.current.tabpage, vim.current.window, vim.current.buffer = cur_pos
             vim.options['eventignore'] = saved_eventignore
+
+    def _bangEnter(self):
+        self._relocateCursor()
+
+    def _relocateCursor(self):
+        inst = self._getInstance()
+        orig_buf_nr = inst.getOriginalPos()[2].number
+        orig_line = inst.getOriginalCursor()[0]
+        tags = []
+        for index, line in enumerate(inst.buffer, 1):
+            if self._supports_preview and index & 1 == 0:
+                continue
+            items = re.split(" *\t *", line)
+            line_nr = int(items[3].rsplit(":", 1)[1])
+            buf_number = int(items[4])
+            if orig_buf_nr == buf_number:
+                tags.append((index, buf_number, line_nr))
+        last = len(tags) - 1
+        while last >= 0:
+            if tags[last][2] <= orig_line:
+                break
+            last -= 1
+        if last >= 0:
+            index = tags[last][0]
+            lfCmd(str(index))
+            lfCmd("norm! zz")
 
 
 #*****************************************************

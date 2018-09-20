@@ -4,6 +4,7 @@
 import vim
 import re
 import os
+import sys
 import os.path
 import subprocess
 import tempfile
@@ -39,7 +40,7 @@ class FunctionExplorer(Explorer):
                 "matla": "--matlab-kinds=f",
                 "pascal": "--pascal-kinds=f",
                 "php": "--php-kinds=f",
-                "python": "--python-kinds=fm",
+                "python": "--python-kinds=fm --language-force=Python",
                 "ruby": "--ruby-kinds=fF",
                 "scheme": "--scheme-kinds=f",
                 "sh": "--sh-kinds=f",
@@ -47,11 +48,16 @@ class FunctionExplorer(Explorer):
                 "tcl": "--tcl-kinds=m",
                 "verilog": "--verilog-kinds=f",
                 "vim": "--vim-kinds=f",
-                "go": "--go-kinds=f"   # universal ctags
+                "go": "--go-kinds=f",  # universal ctags
+                "rust": "--rust-kinds=fPM",  # universal ctags
+                "ocaml": "--ocaml-kinds=mf",   # universal ctags
                 }
+        ctags_opts = lfEval('g:Lf_CtagsFuncOpts')
+        for k, v in ctags_opts.items():
+            self._ctags_options[k] = v
 
     def getContent(self, *args, **kwargs):
-        if len(args) > 0: # all buffers
+        if "--all" in kwargs.get("arguments", {}): # all buffers
             cur_buffer = vim.current.buffer
             for b in vim.buffers:
                 if b.options["buflisted"]:
@@ -71,10 +77,13 @@ class FunctionExplorer(Explorer):
             return itertools.chain.from_iterable(self._getFunctionList())
         else:
             result = self._getFunctionResult(vim.current.buffer)
-            if isinstance(result, list):
-                return result
-            else:
-                return self._formatResult(*result)
+            if not isinstance(result, list):
+                result = self._formatResult(*result)
+            func_list = []
+            for line in result:
+                first, second = line.rsplit("\t", 1)
+                func_list.append("{}\t[:{}".format(first, second.rsplit(":", 1)[1]))
+            return func_list
 
     def _getFunctionList(self):
         buffers = [b for b in vim.buffers]
@@ -114,9 +123,12 @@ class FunctionExplorer(Explorer):
         executor = AsyncExecutor()
         self._executor.append(executor)
         if buffer.options["modified"] == True:
-            with tempfile.NamedTemporaryFile(mode='w+',
-                                             suffix='_'+os.path.basename(buffer.name),
-                                             delete=False) as f:
+            if sys.version_info >= (3, 0):
+                tmp_file = partial(tempfile.NamedTemporaryFile, encoding=lfEval("&encoding"))
+            else:
+                tmp_file = tempfile.NamedTemporaryFile
+
+            with tmp_file(mode='w+', suffix='_'+os.path.basename(buffer.name), delete=False) as f:
                 for line in buffer[:]:
                     f.write(line + '\n')
                 file_name = f.name
@@ -142,16 +154,32 @@ class FunctionExplorer(Explorer):
             return []
 
         func_list = []
+        sorted = True
+        lastln = -1
+
         for _, item  in enumerate(output):
             bufname = buffer.name if vim.options["autochdir"] else lfRelpath(buffer.name)
+            try:
+                ln = int(item[2][:-2], 0)
+            except:
+                ln = -1
+            if lastln > ln:
+                sorted = False
+            else:
+                lastln = ln
             line = "{}\t{}\t[{}:{} {}]".format(item[3],
                                                buffer[int(item[2][:-2]) - 1].strip(),
                                                bufname,        # file
                                                item[2][:-2],   # line
                                                buffer.number
                                                )
-            func_list.append(line)
 
+            func_list.append((ln, line))
+
+        if not sorted:
+            func_list.sort()
+
+        func_list = [ line for ln, line in func_list ]
         self._func_list[buffer.number] = func_list
 
         return func_list
@@ -161,9 +189,6 @@ class FunctionExplorer(Explorer):
 
     def getStlCurDir(self):
         return escQuote(lfEncode(os.getcwd()))
-
-    def isFilePath(self):
-        return False
 
     def removeCache(self, buf_number):
         if buf_number in self._func_list:
@@ -192,6 +217,11 @@ class FunctionExplManager(Manager):
 
     def _defineMaps(self):
         lfCmd("call leaderf#Function#Maps()")
+        lfCmd("augroup Lf_Function")
+        lfCmd("autocmd!")
+        lfCmd("autocmd BufWipeout * call leaderf#Function#removeCache(expand('<abuf>'))")
+        lfCmd("autocmd VimLeavePre * call leaderf#Function#cleanup()")
+        lfCmd("augroup END")
 
     def _acceptSelection(self, *args, **kwargs):
         if len(args) == 0:
@@ -203,7 +233,7 @@ class FunctionExplManager(Manager):
         lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
         lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 100m | setlocal cursorline!")
+        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
 
     def _getDigest(self, line, mode):
         """
@@ -241,8 +271,9 @@ class FunctionExplManager(Manager):
         help.append('" x : open file under cursor in a horizontally split window')
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
-        help.append('" i : switch to input mode')
-        help.append('" q : quit')
+        help.append('" i/<Tab> : switch to input mode')
+        help.append('" p : preview the result')
+        help.append('" q/<Esc> : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -283,13 +314,37 @@ class FunctionExplManager(Manager):
         cur_pos = (vim.current.tabpage, vim.current.window, vim.current.buffer)
 
         saved_eventignore = vim.options['eventignore']
-        vim.options['eventignore'] = 'all'
+        vim.options['eventignore'] = 'BufLeave,WinEnter,BufEnter'
         try:
             vim.current.tabpage, vim.current.window, vim.current.buffer = orig_pos
             self._acceptSelection(line)
         finally:
             vim.current.tabpage, vim.current.window, vim.current.buffer = cur_pos
             vim.options['eventignore'] = saved_eventignore
+
+    def _bangEnter(self):
+        self._relocateCursor()
+
+    def _relocateCursor(self):
+        inst = self._getInstance()
+        orig_buf_nr = inst.getOriginalPos()[2].number
+        orig_line = inst.getOriginalCursor()[0]
+        tags = []
+        for index, line in enumerate(inst.buffer, 1):
+            line = line.rsplit("\t", 1)[1][1:-1]
+            line_nr, buf_number = line.rsplit(":", 1)[1].split()
+            line_nr, buf_number = int(line_nr), int(buf_number)
+            if orig_buf_nr == buf_number:
+                tags.append((index, buf_number, line_nr))
+        last = len(tags) - 1
+        while last >= 0:
+            if tags[last][2] <= orig_line:
+                break
+            last -= 1
+        if last >= 0:
+            index = tags[last][0]
+            lfCmd(str(index))
+            lfCmd("norm! zz")
 
 
 #*****************************************************
@@ -298,3 +353,5 @@ class FunctionExplManager(Manager):
 functionExplManager = FunctionExplManager()
 
 __all__ = ['functionExplManager']
+
+#  vim: set ts=4 sw=4 tw=0 et :

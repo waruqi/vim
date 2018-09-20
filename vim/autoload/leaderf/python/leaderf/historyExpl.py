@@ -18,20 +18,20 @@ class HistoryExplorer(Explorer):
 
     def getContent(self, *args, **kwargs):
         result_list = []
-        if len(args) > 0:
-            tmp = lfEval("@x")
+        if "history" in kwargs:
+            lfCmd("let tmp = @x")
             lfCmd("redir @x")
-            if args[0] == "cmd":
+            if kwargs.get("history") == "cmd":
                 self._history_type = "Cmd_History"
                 lfCmd("silent history :")
-            elif args[0] == "search":
+            elif kwargs.get("history") == "search":
                 self._history_type = "Search_History"
                 lfCmd("silent history /")
             else:
                 self._history_type = "History"
                 lfCmd("let @x = ''")
             result = lfEval("@x")
-            lfCmd("let @x = '%s'" % escQuote(tmp))
+            lfCmd("let @x = tmp")
             lfCmd("redir END")
             result_list = result.splitlines()[2:]
             result_list = [line[1:].lstrip().split(' ', 1)[1] for line in result_list]
@@ -43,9 +43,6 @@ class HistoryExplorer(Explorer):
 
     def getStlCurDir(self):
         return escQuote(lfEncode(os.getcwd()))
-
-    def isFilePath(self):
-        return False
 
     def getHistoryType(self):
         return self._history_type

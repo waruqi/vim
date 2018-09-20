@@ -122,6 +122,13 @@ class LfCli(object):
     def _toEnd(self):
         self._cursor_pos = len(self._cmdline)
 
+    def setPattern(self, pattern):
+        if pattern:
+            self.clear()
+        for ch in pattern:
+            self._insert(ch)
+        self._buildPattern()
+
     def _buildPrompt(self):
         delta_time = datetime.now() - self._start_time
         delta_ms = delta_time.microseconds + (delta_time.seconds +
@@ -316,7 +323,7 @@ class LfCli(object):
                 self._buildPrompt()
                 self._idle = False
 
-                if callback() == False:
+                if lfEval("g:Lf_CursorBlink") == '1' and callback() == False:
                     time.sleep(0.002)
 
                 if lfEval("g:Lf_CursorBlink") == '1':
@@ -343,6 +350,8 @@ class LfCli(object):
                 if lfEval("!type(nr) && nr >= 0x20") == '1':
                     self._insert(lfEval("ch"))
                     self._buildPattern()
+                    if self._refine and self._pattern[1] == '': # e.g. abc;
+                        continue
                     yield '<Update>'
                 else:
                     cmd = ''
@@ -358,7 +367,7 @@ class LfCli(object):
                     elif equal(cmd, '<2-LeftMouse>'):
                         yield '<2-LeftMouse>'
                     elif equal(cmd, '<Esc>'):
-                        yield '<Esc>'
+                        yield '<Quit>'
                     elif equal(cmd, '<C-F>'):
                         if self._supports_nameonly:
                             self._is_fuzzy = True

@@ -37,9 +37,6 @@ class TagExplorer(Explorer):
     def getStlCurDir(self):
         return escQuote(lfEncode(os.getcwd()))
 
-    def isFilePath(self):
-        return False
-
 
 #*****************************************************
 # TagExplManager
@@ -94,7 +91,7 @@ class TagExplManager(Manager):
         if lfEval("search('\V%s', 'wc')" % escQuote(tagname)) == '0':
             lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 100m | setlocal cursorline!")
+        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
 
     def _getDigest(self, line, mode):
         """
@@ -124,8 +121,8 @@ class TagExplManager(Manager):
         help.append('" x : open file under cursor in a horizontally split window')
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
-        help.append('" i : switch to input mode')
-        help.append('" q : quit')
+        help.append('" i/<Tab> : switch to input mode')
+        help.append('" q/<Esc> : quit')
         help.append('" <F5> : refresh the cache')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')

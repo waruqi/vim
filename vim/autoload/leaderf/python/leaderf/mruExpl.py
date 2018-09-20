@@ -4,6 +4,7 @@
 import vim
 import os
 import os.path
+from fnmatch import fnmatch
 from .utils import *
 from .explorer import *
 from .manager import *
@@ -19,6 +20,9 @@ class MruExplorer(Explorer):
         self._max_bufname_len = 0
 
     def getContent(self, *args, **kwargs):
+        mru.saveToCache(lfEval("readfile(lfMru#CacheFileName())"))
+        lfCmd("call writefile([], lfMru#CacheFileName())")
+
         with lfOpen(mru.getCacheFileName(), 'r+', errors='ignore') as f:
             lines = f.readlines()
             lines = [name for name in lines if os.path.exists(lfDecode(name.rstrip()))]
@@ -26,15 +30,18 @@ class MruExplorer(Explorer):
             f.truncate(0)
             f.writelines(lines)
 
-        if len(kwargs) > 0:
+        if "--cwd" in kwargs.get("arguments", {}):
             lines = [name for name in lines if lfDecode(name).startswith(os.getcwd())]
 
         lines = [line.rstrip() for line in lines] # remove the '\n'
+        wildignore = lfEval("g:Lf_MruWildIgnore")
+        lines = [name for name in lines if True not in (fnmatch(name, j) for j in wildignore['file'])
+                    and True not in (fnmatch(name, "*/" + j + "/*") for j in wildignore['dir'])]
 
         if len(lines) == 0:
             return lines
 
-        if args[0] == lines[0]:
+        if kwargs["cb_name"] == lines[0]:
             lines = lines[1:] + lines[0:1]
 
         self._max_bufname_len = max(int(lfEval("strdisplaywidth('%s')"
@@ -76,6 +83,7 @@ class MruExplorer(Explorer):
 
     def getMaxBufnameLen(self):
         return self._max_bufname_len
+
 
 #*****************************************************
 # MruExplManager
@@ -156,11 +164,11 @@ class MruExplManager(Manager):
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" d : remove from mru list')
-        help.append('" i : switch to input mode')
+        help.append('" i/<Tab> : switch to input mode')
         help.append('" s : select multiple files')
         help.append('" a : select all files')
         help.append('" c : clear all selections')
-        help.append('" q : quit')
+        help.append('" q/<Esc> : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -183,12 +191,11 @@ class MruExplManager(Manager):
         line = vim.current.line
         dirname = self._getDigest(line, 2)
         basename = self._getDigest(line, 1)
-        self._explorer.delFromCache(escSpecial(dirname + basename))
+        self._explorer.delFromCache(dirname + basename)
         if len(self._content) > 0:
             self._content.remove(line)
         del vim.current.line
         lfCmd("setlocal nomodifiable")
-
 
 
 #*****************************************************

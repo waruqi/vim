@@ -18,7 +18,7 @@ class LineExplorer(Explorer):
 
     def getContent(self, *args, **kwargs):
         line_list = []
-        if len(args) > 0: # all buffers
+        if "--all" in kwargs.get("arguments", {}): # all buffers
             cur_buffer = vim.current.buffer
             for b in vim.buffers:
                 if b.options["buflisted"]:
@@ -33,17 +33,18 @@ class LineExplorer(Explorer):
 
     def _getLineList(self, buffer):
         bufname = os.path.basename(buffer.name)
-        return ["%s\t[%s:%d %d]" % (line, bufname, i, buffer.number)
-                for i, line in enumerate(buffer, 1) if line and not line.isspace()]
+        if sys.version_info >= (3, 0):
+            return ["%s\t[%s:%d %d]" % (line.encode('utf-8', "replace").decode('utf-8', "replace"), bufname, i, buffer.number)
+                    for i, line in enumerate(buffer, 1) if line and not line.isspace()]
+        else:
+            return ["%s\t[%s:%d %d]" % (line, bufname, i, buffer.number)
+                    for i, line in enumerate(buffer, 1) if line and not line.isspace()]
 
     def getStlCategory(self):
         return 'Line'
 
     def getStlCurDir(self):
         return escQuote(lfEncode(os.getcwd()))
-
-    def isFilePath(self):
-        return False
 
 
 #*****************************************************
@@ -69,7 +70,7 @@ class LineExplManager(Manager):
         lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
         lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 100m | setlocal cursorline!")
+        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
 
     def _getDigest(self, line, mode):
         """
@@ -97,8 +98,8 @@ class LineExplManager(Manager):
         help.append('" x : open file under cursor in a horizontally split window')
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
-        help.append('" i : switch to input mode')
-        help.append('" q : quit')
+        help.append('" i/<Tab> : switch to input mode')
+        help.append('" q/<Esc> : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help

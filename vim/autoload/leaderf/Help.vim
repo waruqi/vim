@@ -22,7 +22,9 @@ function! leaderf#Help#Maps()
     nnoremap <buffer> <silent> v             :exec g:Lf_py "helpExplManager.accept('v')"<CR>
     nnoremap <buffer> <silent> t             :exec g:Lf_py "helpExplManager.accept('t')"<CR>
     nnoremap <buffer> <silent> q             :exec g:Lf_py "helpExplManager.quit()"<CR>
+    " nnoremap <buffer> <silent> <Esc>         :exec g:Lf_py "helpExplManager.quit()"<CR>
     nnoremap <buffer> <silent> i             :exec g:Lf_py "helpExplManager.input()"<CR>
+    nnoremap <buffer> <silent> <Tab>         :exec g:Lf_py "helpExplManager.input()"<CR>
     nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "helpExplManager.toggleHelp()"<CR>
     if has_key(g:Lf_NormalMap, "Help")
         for i in g:Lf_NormalMap["Help"]
@@ -33,4 +35,8 @@ endfunction
 
 function! leaderf#Help#startExpl(win_pos, ...)
     call leaderf#LfPy("helpExplManager.startExplorer('".a:win_pos."')")
+endfunction
+
+function! leaderf#Help#startExplPattern(win_pos, pattern)
+    call leaderf#LfPy("helpExplManager.startExplorer('".a:win_pos."', pattern='".a:pattern."')")
 endfunction

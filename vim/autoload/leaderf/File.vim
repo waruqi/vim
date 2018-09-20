@@ -11,8 +11,6 @@ if leaderf#versionCheck() == 0  " this check is necessary
     finish
 endif
 
-let g:Lf_fileExpl_loaded = 1
-
 exec g:Lf_py "from leaderf.fileExpl import *"
 
 function! leaderf#File#Maps()
@@ -24,7 +22,9 @@ function! leaderf#File#Maps()
     nnoremap <buffer> <silent> v             :exec g:Lf_py "fileExplManager.accept('v')"<CR>
     nnoremap <buffer> <silent> t             :exec g:Lf_py "fileExplManager.accept('t')"<CR>
     nnoremap <buffer> <silent> q             :exec g:Lf_py "fileExplManager.quit()"<CR>
+    " nnoremap <buffer> <silent> <Esc>         :exec g:Lf_py "fileExplManager.quit()"<CR>
     nnoremap <buffer> <silent> i             :exec g:Lf_py "fileExplManager.input()"<CR>
+    nnoremap <buffer> <silent> <Tab>         :exec g:Lf_py "fileExplManager.input()"<CR>
     nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "fileExplManager.toggleHelp()"<CR>
     nnoremap <buffer> <silent> <F5>          :exec g:Lf_py "fileExplManager.refresh()"<CR>
     nnoremap <buffer> <silent> s             :exec g:Lf_py "fileExplManager.addSelections()"<CR>
@@ -42,8 +42,12 @@ function! leaderf#File#startExpl(win_pos, ...)
         call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."')")
     else
         let dir = fnamemodify(a:1.'/',":h:gs?\\?/?")
-        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."','".dir."')")
+        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."', arguments={'directory': ['".dir."']})")
     endif
+endfunction
+
+function! leaderf#File#startExplPattern(win_pos, pattern)
+    call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."', pattern='".a:pattern."')")
 endfunction
 
 function! leaderf#File#cleanup()

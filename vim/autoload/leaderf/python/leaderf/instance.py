@@ -44,6 +44,7 @@ class LfInstance(object):
         lfCmd("let g:Lf_{}_StlMode = '-'".format(self._category))
         lfCmd("let g:Lf_{}_StlCwd= '-'".format(self._category))
         lfCmd("let g:Lf_{}_StlTotal = '0'".format(self._category))
+        lfCmd("let g:Lf_{}_StlResultsCount = '0'".format(self._category))
 
         stl = "%#Lf_hl_{0}_stlName# LeaderF "
         stl += "%#Lf_hl_{0}_stlSeparator0#%{{g:Lf_StlSeparator.left}}"
@@ -55,7 +56,7 @@ class LfInstance(object):
         stl += "%#Lf_hl_{0}_stlSeparator3#%{{g:Lf_StlSeparator.left}}"
         stl += "%=%#Lf_hl_{0}_stlBlank#"
         stl += "%#Lf_hl_{0}_stlSeparator4#%{{g:Lf_StlSeparator.right}}"
-        stl += "%#Lf_hl_{0}_stlLineInfo# %l/%L "
+        stl += "%#Lf_hl_{0}_stlLineInfo# %l/%{{g:Lf_{0}_StlResultsCount}} "
         stl += "%#Lf_hl_{0}_stlSeparator5#%{{g:Lf_StlSeparator.right}}"
         stl += "%#Lf_hl_{0}_stlTotal# Total: %{{g:Lf_{0}_StlTotal}} "
         self._stl = stl.format(self._category)
@@ -73,7 +74,7 @@ class LfInstance(object):
         lfCmd("setlocal number")
         lfCmd("setlocal norelativenumber")
         lfCmd("setlocal nospell")
-        lfCmd("setlocal nowrap")
+        lfCmd("setlocal wrap")
         lfCmd("setlocal nofoldenable")
         lfCmd("setlocal foldcolumn=0")
         lfCmd("setlocal foldmethod=manual")
@@ -86,10 +87,12 @@ class LfInstance(object):
         lfCmd("redrawstatus")
         if not self._is_autocmd_set:
             self._is_autocmd_set = True
+            lfCmd("augroup Lf_{}_Colorscheme".format(self._category))
             lfCmd("autocmd ColorScheme * call leaderf#colorscheme#setStatusline({}, '{}')"
                   .format(self.buffer.number, self._stl))
             lfCmd("autocmd WinEnter,FileType * call leaderf#colorscheme#setStatusline({}, '{}')"
                   .format(self.buffer.number, self._stl))
+            lfCmd("augroup END")
 
     def _createBufWindow(self, win_pos):
         self._win_pos = win_pos
@@ -143,11 +146,14 @@ class LfInstance(object):
         self._window_object = vim.current.window
         if self._buffer_object is None:
             self._buffer_object = vim.current.buffer
+            lfCmd("augroup Lf_{}_Colorscheme".format(self._category))
             lfCmd("autocmd ColorScheme * call leaderf#colorscheme#highlight('{}')"
                   .format(self._category))
             lfCmd("autocmd ColorScheme * call leaderf#colorscheme#highlightMode('{0}', g:Lf_{0}_StlMode)"
                   .format(self._category))
             lfCmd("autocmd ColorScheme <buffer> doautocmd syntax")
+            lfCmd("autocmd VimResized * let g:Lf_VimResized = 1")
+            lfCmd("augroup END")
 
     def _enterOpeningBuffer(self):
         if (self._tabpage_object and self._tabpage_object.valid
@@ -173,11 +179,15 @@ class LfInstance(object):
     def setStlTotal(self, total):
         lfCmd("let g:Lf_{}_StlTotal = '{}'".format(self._category, total))
 
+    def setStlResultsCount(self, count):
+        lfCmd("let g:Lf_{}_StlResultsCount = '{}'".format(self._category, count))
+
     def enterBuffer(self, win_pos):
         if self._enterOpeningBuffer():
             return
 
         self._orig_pos = (vim.current.tabpage, vim.current.window, vim.current.buffer)
+        self._orig_cursor = vim.current.window.cursor
 
         self._before_enter()
 
@@ -210,7 +220,13 @@ class LfInstance(object):
                 lfCmd("silent! hide")
                 # 'silent!' is used to skip error E16.
                 lfCmd("silent! exec '%d wincmd w'" % self._orig_win_nr)
-                lfCmd(self._restore_sizes)
+                if lfEval("get(g:, 'Lf_VimResized', 0)") == '0':
+                    lfCmd(self._restore_sizes) # why this line does not take effect?
+                                               # it's weird. repeat 4 times
+                    lfCmd(self._restore_sizes) # fix issue #102
+                    lfCmd(self._restore_sizes) # fix issue #102
+                    lfCmd(self._restore_sizes) # fix issue #102
+                    lfCmd(self._restore_sizes) # fix issue #102
             else:
                 lfCmd("bd")
 
@@ -220,9 +236,9 @@ class LfInstance(object):
 
     def setBuffer(self, content):
         self.buffer.options['modifiable'] = True
-        if lfEval("has('nvim')") == '1':
-            # NvimError: string cannot contain newlines
-            content = [ line.rstrip("\r\n") for line in content ]
+        # if lfEval("has('nvim')") == '1':
+        #     # NvimError: string cannot contain newlines
+        #     content = [ line.rstrip("\r\n") for line in content ]
         self._buffer_object[:] = content
 
     def appendLine(self, line):
@@ -277,5 +293,13 @@ class LfInstance(object):
     def empty(self):
         return len(self._buffer_object) == 1 and self._buffer_object[0] == ''
 
+    def getCurrentPos(self):
+        return self._window_object.cursor
+
     def getOriginalPos(self):
         return self._orig_pos
+
+    def getOriginalCursor(self):
+        return self._orig_cursor
+
+#  vim: set ts=4 sw=4 tw=0 et :

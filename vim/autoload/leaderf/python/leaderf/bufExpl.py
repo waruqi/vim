@@ -21,21 +21,37 @@ class BufferExplorer(Explorer):
         self._max_bufname_len = 0
 
     def getContent(self, *args, **kwargs):
-        show_unlisted = False if len(args) == 0 else args[0]
-        if show_unlisted:
-            buffers = {b.number: b for b in vim.buffers
-                       if os.path.basename(b.name) != "LeaderF"}
+        mru_bufnrs = []
+        for num in reversed(lfEval("g:Lf_MruBufnrs")):
+            if num not in mru_bufnrs:
+                mru_bufnrs.append(int(num))
+        for num in reversed(mru_bufnrs):
+            mru.setBufferTimestamp(num)
+        lfCmd("let g:Lf_MruBufnrs = []")
+
+        if "--all" not in kwargs.get("arguments", {}):
+            if "--tabpage" not in kwargs.get("arguments", {}):
+                buffers = {b.number: b for b in vim.buffers
+                           if lfEval("buflisted(%d)" % b.number) == '1'}
+            else:
+                buffers = {w.buffer.number: w.buffer for w in vim.current.tabpage.windows
+                           if lfEval("buflisted(%d)" % w.buffer.number) == '1'}
         else:
-            buffers = {b.number: b for b in vim.buffers
-                       if lfEval("buflisted(%d)" % b.number) == '1'}
+            if "--tabpage" not in kwargs.get("arguments", {}):
+                buffers = {b.number: b for b in vim.buffers
+                           if os.path.basename(b.name) != "LeaderF"}
+            else:
+                buffers = {w.buffer.number: w.buffer for w in vim.current.tabpage.windows
+                           if os.path.basename(w.buffer.name) != "LeaderF"}
+
 
         # e.g., 12 u %a+- aaa.txt
-        bufnr_len = len(str(len(vim.buffers)))
+        bufnr_len = len(lfEval("bufnr('$')"))
         self._prefix_length = bufnr_len + 8
 
-        self._max_bufname_len = max(int(lfEval("strdisplaywidth('%s')"
+        self._max_bufname_len = max([int(lfEval("strdisplaywidth('%s')"
                                         % escQuote(getBasename(buffers[nr].name))))
-                                    for nr in mru.getMruBufnrs() if nr in buffers)
+                                    for nr in mru.getMruBufnrs() if nr in buffers] or [0])
 
         bufnames = []
         for nr in mru.getMruBufnrs():
@@ -155,8 +171,8 @@ class BufExplManager(Manager):
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" d : wipe out buffer under cursor')
         help.append('" D : delete buffer under cursor')
-        help.append('" i : switch to input mode')
-        help.append('" q : quit')
+        help.append('" i/<Tab> : switch to input mode')
+        help.append('" q/<Esc> : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help

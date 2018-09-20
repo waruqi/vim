@@ -36,7 +36,7 @@ class FileExplorer(Explorer):
     def __init__(self):
         self._cur_dir = ''
         self._content = []
-        self._cache_dir = os.path.join(lfEval("g:Lf_CacheDiretory"),
+        self._cache_dir = os.path.join(lfEval("g:Lf_CacheDirectory"),
                                        '.LfCache',
                                        'python' + lfEval("g:Lf_PythonVersion"),
                                        'file')
@@ -44,6 +44,7 @@ class FileExplorer(Explorer):
         self._external_cmd = None
         self._initCache()
         self._executor = []
+        self._no_ignore = None
 
     def _initCache(self):
         if not os.path.exists(self._cache_dir):
@@ -204,7 +205,7 @@ class FileExplorer(Explorer):
             else:
                 return glob
 
-    def _buildCmd(self, dir):
+    def _buildCmd(self, dir, **kwargs):
         if lfEval("g:Lf_ShowRelativePath") == '1':
             dir = os.path.relpath(dir)
 
@@ -215,7 +216,28 @@ class FileExplorer(Explorer):
 
         if lfEval("g:Lf_UseVersionControlTool") == '1':
             if self._exists(dir, ".git"):
-                cmd = "git ls-files && git ls-files --others --exclude-standard"
+                wildignore = lfEval("g:Lf_WildIgnore")
+                if ".git" in wildignore["dir"]:
+                    wildignore["dir"].remove(".git")
+                if ".git" in wildignore["file"]:
+                    wildignore["file"].remove(".git")
+                ignore = ""
+                for i in wildignore["dir"]:
+                    ignore += ' -x "%s"' % i
+                for i in wildignore["file"]:
+                    ignore += ' -x "%s"' % i
+
+                if "--no-ignore" in kwargs.get("arguments", {}):
+                    no_ignore = ""
+                else:
+                    no_ignore = "--exclude-standard"
+
+                if lfEval("get(g:, 'Lf_RecurseSubmodules', 0)") == '1':
+                    recurse_submodules = "--recurse-submodules"
+                else:
+                    recurse_submodules = ""
+
+                cmd = "git ls-files %s && git ls-files --others %s %s" % (recurse_submodules, no_ignore, ignore)
                 self._external_cmd = cmd
                 return cmd
             elif self._exists(dir, ".hg"):
@@ -249,51 +271,89 @@ class FileExplorer(Explorer):
                 color = ""
                 ignore = ""
                 for i in wildignore["dir"]:
-                    ignore += ' -g "!%s"' % i
+                    if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'): # rg does not show hidden files by default
+                        ignore += ' -g "!%s"' % i
                 for i in wildignore["file"]:
-                    ignore += ' -g "!%s"' % i
+                    if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'):
+                        ignore += ' -g "!%s"' % i
             else:
                 color = "--color never"
                 ignore = ""
                 for i in wildignore["dir"]:
-                    ignore += " -g '!%s'" % i
+                    if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'):
+                        ignore += " -g '!%s'" % i
                 for i in wildignore["file"]:
-                    ignore += " -g '!%s'" % i
+                    if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'):
+                        ignore += " -g '!%s'" % i
 
             if lfEval("g:Lf_FollowLinks") == '1':
                 followlinks = "-L"
             else:
                 followlinks = ""
 
-            cmd = 'rg --no-messages --files %s %s %s "%s"' % (color, ignore, followlinks, dir)
+            if lfEval("g:Lf_ShowHidden") == '0':
+                show_hidden = ""
+            else:
+                show_hidden = "--hidden"
+
+            if "--no-ignore" in kwargs.get("arguments", {}):
+                no_ignore = "--no-ignore"
+            else:
+                no_ignore = ""
+
+            cmd = 'rg --no-messages --files %s %s %s %s %s "%s"' % (color, ignore, followlinks, show_hidden, no_ignore, dir)
         elif default_tool["pt"] and lfEval("executable('pt')") == '1' and os.name != 'nt': # there is bug on Windows
             wildignore = lfEval("g:Lf_WildIgnore")
             ignore = ""
             for i in wildignore["dir"]:
-                ignore += " --ignore=%s" % i
+                if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'): # pt does not show hidden files by default
+                    ignore += " --ignore=%s" % i
             for i in wildignore["file"]:
-                ignore += " --ignore=%s" % i
+                if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'):
+                    ignore += " --ignore=%s" % i
 
             if lfEval("g:Lf_FollowLinks") == '1':
                 followlinks = "-f"
             else:
                 followlinks = ""
 
-            cmd = 'pt --nocolor %s %s -g="" "%s"' % (ignore, followlinks, dir)
-        elif default_tool["ag"] and lfEval("executable('ag')") == '1':
+            if lfEval("g:Lf_ShowHidden") == '0':
+                show_hidden = ""
+            else:
+                show_hidden = "--hidden"
+
+            if "--no-ignore" in kwargs.get("arguments", {}):
+                no_ignore = "-U"
+            else:
+                no_ignore = ""
+
+            cmd = 'pt --nocolor %s %s %s %s -g="" "%s"' % (ignore, followlinks, show_hidden, no_ignore, dir)
+        elif default_tool["ag"] and lfEval("executable('ag')") == '1' and os.name != 'nt': # https://github.com/vim/vim/issues/3236
             wildignore = lfEval("g:Lf_WildIgnore")
             ignore = ""
             for i in wildignore["dir"]:
-                ignore += ' --ignore "%s"' % i
+                if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'): # ag does not show hidden files by default
+                    ignore += ' --ignore "%s"' % i
             for i in wildignore["file"]:
-                ignore += ' --ignore "%s"' % i
+                if lfEval("g:Lf_ShowHidden") != '0' or not i.startswith('.'):
+                    ignore += ' --ignore "%s"' % i
 
             if lfEval("g:Lf_FollowLinks") == '1':
                 followlinks = "-f"
             else:
                 followlinks = ""
 
-            cmd = 'ag --nocolor %s %s -g "" "%s"' % (ignore, followlinks, dir)
+            if lfEval("g:Lf_ShowHidden") == '0':
+                show_hidden = ""
+            else:
+                show_hidden = "--hidden"
+
+            if "--no-ignore" in kwargs.get("arguments", {}):
+                no_ignore = "-U"
+            else:
+                no_ignore = ""
+
+            cmd = 'ag --nocolor --silent %s %s %s %s -g "" "%s"' % (ignore, followlinks, show_hidden, no_ignore, dir)
         elif default_tool["find"] and lfEval("executable('find')") == '1' \
                 and lfEval("executable('sed')") == '1':
             wildignore = lfEval("g:Lf_WildIgnore")
@@ -315,11 +375,23 @@ class FileExplorer(Explorer):
             else:
                 strip = ""
 
-            cmd = 'find %s "%s" -name . -o %s %s -type f -print %s' % (followlinks,
-                                                                       dir,
-                                                                       ignore_dir,
-                                                                       ignore_file,
-                                                                       strip)
+            if os.name == 'nt':
+                redir_err = ""
+            else:
+                redir_err = " 2>/dev/null"
+
+            if lfEval("g:Lf_ShowHidden") == '0':
+                show_hidden = '-name ".*" -prune -o'
+            else:
+                show_hidden = ""
+
+            cmd = 'find %s "%s" -name "." -o %s %s %s -type f -print %s %s' % (followlinks,
+                                                                               dir,
+                                                                               ignore_dir,
+                                                                               ignore_file,
+                                                                               show_hidden,
+                                                                               redir_err,
+                                                                               strip)
         else:
             cmd = None
 
@@ -338,6 +410,14 @@ class FileExplorer(Explorer):
                     break
 
             if target != -1:    # already cached
+                if time.time() - self._cmd_start_time <= float(lfEval("g:Lf_NeedCacheTime")):
+                    os.remove(os.path.join(self._cache_dir, lines[target].split(None, 2)[1]))
+                    del lines[target]
+                    f.seek(0)
+                    f.truncate(0)
+                    f.writelines(lines)
+                    return
+
                 # update the time
                 lines[target] = re.sub('^\S*',
                                        '%.3f' % time.time(),
@@ -351,6 +431,9 @@ class FileExplorer(Explorer):
                     for line in content:
                         cache_file.write(line + '\n')
             else:
+                if time.time() - self._cmd_start_time <= float(lfEval("g:Lf_NeedCacheTime")):
+                    return
+
                 cache_file_name = ''
                 if len(lines) < int(lfEval("g:Lf_NumberOfCache")):
                     f.seek(0, 2)
@@ -423,26 +506,34 @@ class FileExplorer(Explorer):
 
     def setContent(self, content):
         self._content = content
-        if lfEval("g:Lf_UseCache") == '1' and \
-                time.time() - self._cmd_start_time > float(lfEval("g:Lf_NeedCacheTime")):
+        if lfEval("g:Lf_UseCache") == '1':
             self._writeCache(content)
 
     def getContent(self, *args, **kwargs):
-        if len(args) > 0:
-            if os.path.exists(lfDecode(args[0])):
-                lfCmd("silent cd %s" % args[0])
+        if kwargs.get("arguments", {}).get("directory"):
+            dir = kwargs.get("arguments", {}).get("directory")[0]
+            if os.path.exists(os.path.expanduser(lfDecode(dir))):
+                lfCmd("silent cd %s" % dir)
             else:
                 lfCmd("echohl ErrorMsg | redraw | echon "
-                      "'Unknown directory `%s`' | echohl NONE" % args[0])
+                      "'Unknown directory `%s`' | echohl NONE" % dir)
                 return None
 
         dir = os.getcwd()
 
-        if lfEval("g:Lf_UseMemoryCache") == '0' or dir != self._cur_dir or \
+        no_ignore = kwargs.get("arguments", {}).get("--no-ignore")
+        if no_ignore != self._no_ignore:
+            self._no_ignore = no_ignore
+            arg_changes = True
+        else:
+            arg_changes = False
+
+        if arg_changes or lfEval("g:Lf_UseMemoryCache") == '0' or dir != self._cur_dir or \
                 not self._content:
             self._cur_dir = dir
 
-            cmd = self._buildCmd(dir)
+            cmd = self._buildCmd(dir, **kwargs)
+            lfCmd("let g:Lf_Debug_Cmd = '%s'" % escQuote(cmd))
 
             if lfEval("g:Lf_UseCache") == '1' and kwargs.get("refresh", False) == False:
                 self._content = self._getFilesFromCache()
@@ -500,6 +591,10 @@ class FileExplManager(Manager):
 
     def _defineMaps(self):
         lfCmd("call leaderf#File#Maps()")
+        lfCmd("augroup Lf_File")
+        lfCmd("autocmd!")
+        lfCmd("autocmd VimLeavePre * call leaderf#File#cleanup()")
+        lfCmd("augroup END")
 
     def _createHelp(self):
         help = []
@@ -507,15 +602,104 @@ class FileExplManager(Manager):
         help.append('" x : open file under cursor in a horizontally split window')
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
-        help.append('" i : switch to input mode')
+        help.append('" i/<Tab> : switch to input mode')
         help.append('" s : select multiple files')
         help.append('" a : select all files')
         help.append('" c : clear all selections')
-        help.append('" q : quit')
+        help.append('" q/<Esc> : quit')
         help.append('" <F5> : refresh the cache')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
+
+    def _restoreOrigCwd(self):
+        if self._orig_cwd is None:
+            return
+
+        # https://github.com/neovim/neovim/issues/8336
+        if lfEval("has('nvim')") == '1':
+            chdir = vim.chdir
+        else:
+            chdir = os.chdir
+
+        try:
+            if int(lfEval("&autochdir")) == 0 and os.getcwd() != self._orig_cwd:
+                chdir(self._orig_cwd)
+        except:
+            if os.getcwd() != self._orig_cwd:
+                chdir(self._orig_cwd)
+
+    def _nearestAncestor(self, markers, path):
+        """
+        return the nearest ancestor path(including itself) of `path` that contains
+        one of files or directories in `markers`.
+        `markers` is a list of file or directory names.
+        """
+        if os.name == 'nt':
+            # e.g. C:\\
+            root = os.path.splitdrive(os.path.abspath(path))[0] + os.sep
+        else:
+            root = '/'
+
+        path = os.path.abspath(path)
+        while path != root:
+            for name in markers:
+                if os.path.exists(os.path.join(path, name)):
+                    return path
+            path = os.path.abspath(os.path.join(path, ".."))
+
+        for name in markers:
+            if os.path.exists(os.path.join(path, name)):
+                return path
+
+        return ""
+
+    def startExplorer(self, win_pos, *args, **kwargs):
+        if kwargs.get("arguments", {}).get("directory"): # behavior no change for `LeaderfFile <directory>`
+            self._orig_cwd = None
+            super(FileExplManager, self).startExplorer(win_pos, *args, **kwargs)
+            return
+
+        self._orig_cwd = os.getcwd()
+        root_markers = lfEval("g:Lf_RootMarkers")
+        mode = lfEval("g:Lf_WorkingDirectoryMode")
+
+        # https://github.com/neovim/neovim/issues/8336
+        if lfEval("has('nvim')") == '1':
+            chdir = vim.chdir
+        else:
+            chdir = os.chdir
+
+        cur_buf_name = lfDecode(vim.current.buffer.name)
+        fall_back = False
+        if 'a' in mode:
+            working_dir = self._nearestAncestor(root_markers, self._orig_cwd)
+            if working_dir: # there exists a root marker in nearest ancestor path
+                chdir(working_dir)
+            else:
+                fall_back = True
+        elif 'A' in mode:
+            if cur_buf_name:
+                working_dir = self._nearestAncestor(root_markers, os.path.dirname(cur_buf_name))
+            else:
+                working_dir = ""
+            if working_dir: # there exists a root marker in nearest ancestor path
+                chdir(working_dir)
+            else:
+                fall_back = True
+        else:
+            fall_back = True
+
+        if fall_back:
+            if 'f' in mode:
+                if cur_buf_name:
+                    chdir(os.path.dirname(cur_buf_name))
+            elif 'F' in mode:
+                if cur_buf_name and not os.path.dirname(cur_buf_name).startswith(self._orig_cwd):
+                    chdir(os.path.dirname(cur_buf_name))
+
+        super(FileExplManager, self).startExplorer(win_pos, *args, **kwargs)
+
 
 #*****************************************************
 # fileExplManager is a singleton

@@ -22,7 +22,9 @@ function! leaderf#Buffer#Maps()
     nnoremap <buffer> <silent> v             :exec g:Lf_py "bufExplManager.accept('v')"<CR>
     nnoremap <buffer> <silent> t             :exec g:Lf_py "bufExplManager.accept('t')"<CR>
     nnoremap <buffer> <silent> q             :exec g:Lf_py "bufExplManager.quit()"<CR>
+    " nnoremap <buffer> <silent> <Esc>         :exec g:Lf_py "bufExplManager.quit()"<CR>
     nnoremap <buffer> <silent> i             :exec g:Lf_py "bufExplManager.input()"<CR>
+    nnoremap <buffer> <silent> <Tab>         :exec g:Lf_py "bufExplManager.input()"<CR>
     nnoremap <buffer> <silent> <F1>          :exec g:Lf_py "bufExplManager.toggleHelp()"<CR>
     nnoremap <buffer> <silent> d             :exec g:Lf_py "bufExplManager.deleteBuffer(1)"<CR>
     nnoremap <buffer> <silent> D             :exec g:Lf_py "bufExplManager.deleteBuffer()"<CR>
@@ -36,8 +38,15 @@ endfunction
 function! leaderf#Buffer#startExpl(win_pos, ...)
     if a:0 == 0
         call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."')")
+    elseif a:1 == 1
+        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."', arguments={'--all': []})")
+    elseif a:1 == 2
+        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."', arguments={'--tabpage': []})")
     else
-        let arg = a:1 == 0 ? 'False' : 'True'
-        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."',".arg.")")
+        call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."', arguments={'--tabpage': [], '--all': []})")
     endif
+endfunction
+
+function! leaderf#Buffer#startExplPattern(win_pos, pattern)
+    call leaderf#LfPy("bufExplManager.startExplorer('".a:win_pos."', pattern='".a:pattern."')")
 endfunction

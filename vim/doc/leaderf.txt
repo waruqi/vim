@@ -96,16 +96,16 @@ g:Lf_DefaultMode                                *g:Lf_DefaultMode*
     'FullPath' - fuzzy mode, match full path when searching
     'Fuzzy' - fuzzy mode, when lines in the result are not file path
     'Regex' - regex mode
-    Default value is 'NameOnly'
+    Default value is 'FullPath'
 
 g:Lf_CursorBlink                                *g:Lf_CursorBlink*
     Set this option to 1 to let the cursor in the prompt blink, if you don't
     want the cursor to blink, set the value to 0.
 
-g:Lf_CacheDiretory                              *g:Lf_CacheDiretory*
+g:Lf_CacheDirectory                              *g:Lf_CacheDirectory*
     Set this option to change the location of the cache directory.
     e.g. >
-    let g:Lf_CacheDiretory = '/root'
+    let g:Lf_CacheDirectory = '/root'
 <
     Default value is $HOME.
 
@@ -139,8 +139,8 @@ g:Lf_WildIgnore                                 *g:Lf_WildIgnore*
     Specify the files and directories you want to exclude while indexing.
     Default value is: >
     let g:Lf_WildIgnore = {
-            \ 'dir': ['.svn','.git','.hg'],
-            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]']
+            \ 'dir': [],
+            \ 'file': []
             \}
 <
     Here uses the Unix shell-style wildcards, which are not the same as
@@ -153,6 +153,12 @@ g:Lf_WildIgnore                                 *g:Lf_WildIgnore*
     [seq]    | matches any character in seq
     [!seq]   | matches any character not in seq
     -------------------------------------------
+<
+    For example, you can set as below: >
+    let g:Lf_WildIgnore = {
+            \ 'dir': ['.svn','.git','.hg'],
+            \ 'file': ['*.sw?','~$*','*.bak','*.exe','*.o','*.so','*.py[co]']
+            \}
 <
 g:Lf_DelimiterChar                              *g:Lf_DelimiterChar*
     In NameOnly mode, if you want to refine the result by typing extra
@@ -193,7 +199,7 @@ g:Lf_StlColorscheme                             *g:Lf_StlColorscheme*
 g:Lf_StlSeparator                               *g:Lf_StlSeparator*
     A Dictionary to store separators.
     The default value is >
-    let g:Lf_StlSeparator = { 'left': '►', 'right': '◄' }
+    let g:Lf_StlSeparator = { 'left': '►', 'right': '◄', 'font': '' }
 <
     If you don't like using separators, you can set the value as below: >
     let g:Lf_StlSeparator = { 'left': '', 'right': '' }
@@ -221,6 +227,10 @@ g:Lf_StlSeparator                               *g:Lf_StlSeparator*
 <
     For |vim-powerline| font users: >
     let g:Lf_StlSeparator = { 'left': "\u2b80", 'right': "\u2b82" }
+<
+    If you haven't set the global option |guifont|, you can still use the patched
+    fonts, e.g., >
+    let g:Lf_StlSeparator = { 'left': "\ue0b0", 'right': "\ue0b2", 'font': "DejaVu Sans Mono for Powerline" }
 <
 g:Lf_StlPalette                                 *g:Lf_StlPalette*
     This is a dictionary, you can customize the colorscheme using this option.
@@ -346,6 +356,14 @@ g:Lf_Ctags                                      *g:Lf_Ctags*
 <
     Default value is "ctags".
 
+g:Lf_CtagsFuncOpts                              *g:Lf_CtagsFuncOpts*
+    Use this option to specify the options of ctags to generate the tags of
+    functions. e.g., >
+    let g:Lf_CtagsFuncOpts = {
+            \ 'c': '--c-kinds=fp',
+            \ 'rust': '--rust-kinds=f',
+            \ }
+<
 g:Lf_PreviewCode                                *g:Lf_PreviewCode*
     Use this option to specify whether to show the preview of the code the tag
     locates in when navigating the tags.
@@ -355,7 +373,7 @@ g:Lf_PreviewCode                                *g:Lf_PreviewCode*
 g:Lf_DefaultExternalTool                        *g:Lf_DefaultExternalTool*
     Use this option to specify the default external tool which is used to
     index the files. Possible values are 'rg', 'pt'(not available on Windows),
-    'ag', 'find'.  If you do not want to use the external tool: >
+    'ag'(not available on Windows), 'find'.  If you do not want to use the external tool: >
     let g:Lf_DefaultExternalTool = ""
 <
     By default, use the external tool in the sequence of 'rg', 'pt', 'ag', 'find'
@@ -437,13 +455,66 @@ g:Lf_NormalMap                                  *g:Lf_NormalMap*
         \ "Colorscheme": []
         \}
 <
+g:Lf_RootMarkers                                *g:Lf_RootMarkers*
+    Use this option to set the root markers.
+    e.g., >
+    let g:Lf_RootMarkers = ['.project', '.project2']
+<
+    Default value is ['.git', '.hg', '.svn']
+
+g:Lf_WorkingDirectoryMode                       *g:Lf_WorkingDirectoryMode*
+    This option customizes LeaderF's working directory.
+    e.g., >
+    let g:Lf_WorkingDirectoryMode = 'Ac'
+<
+    c - the directory of the current working directory.(default)
+    a - the nearest ancestor of current working directory that contains one of
+        directories or files defined in |g:Lf_RootMarkers|. Fall back to 'c' if
+        no such ancestor directory found.
+    A - the nearest ancestor of current file that contains one of directories
+        or files defined in |g:Lf_RootMarkers|. Fall back to 'c' if no such
+        ancestor directory found.
+    f - the directory of the current file.
+    F - if the current working directory is not the direct ancestor of current
+        file, use the directory of the current file as LeaderF's working
+        directory, otherwise, same as 'c'.
+    Note: if "f", "F" is included with "a" or "A", use the behavior of "f" or
+    "F"(as a fallback) when a root can't be found.
+
 g:Lf_CommandMap                                 *g:Lf_CommandMap*
     Use this option to customize the mappings inside LeaderF's
     prompt(|leaderf-prompt|).
     for example, if you want to change the default command <C-F> to <C-D> and
-    change the default command <C-Q> to <Esc>: >
-    let g:Lf_CommandMap = {'<C-F>': ['<C-D>'], '<C-Q>': ['<Esc>']}
+    change the default command <ESC> to <C-A> and <C-B>: >
+    let g:Lf_CommandMap = {'<C-F>': ['<C-D>'], '<ESC>': ['<C-A>', '<C-B>']}
 <
+g:Lf_HideHelp                                   *g:Lf_HideHelp*
+    To specify whether to show the hint "Press <F1> for help" in normal mode.
+    You can set the value to 1 to hide the hint.
+    Default value is 0.
+
+g:Lf_ShowHidden                                 *g:Lf_ShowHidden*
+    To Specify whether to search hidden files and directories.
+    Default value is 0.(do not search hidden files and directories)
+
+g:Lf_MruWildIgnore                              *g:Lf_MruWildIgnore*
+    This option indicates that do not display the MRU files whose file name
+    matches the patterns defined in it.
+    See |g:Lf_WildIgnore| for the usage of pattern.
+
+    Default value is: >
+    let g:Lf_MruWildIgnore = {
+            \ 'dir': [],
+            \ 'file': []
+            \}
+<
+g:Lf_RecurseSubmodules                          *g:Lf_RecurseSubmodules*
+    This option indicates whether to show the files in submodules of git
+    repository. If the value is 1, it means git command has '--recurse-submodules'
+    option. Because '--recurse-submodules' was first introduced by git version
+    2.11+ and there will be an error if git version is lower than 2.11, this
+    option is off with value 0 by default.
+
 ==============================================================================
 USAGE                                           *leaderf-usage*
 
@@ -499,10 +570,10 @@ USAGE                                           *leaderf-usage*
     Launch LeaderF to switch between colorschemes.
 
 Once LeaderF is launched:                       *prompt* *leaderf-prompt*
-    <C-C> : quit from LeaderF.
+    <C-C>, <ESC> : quit from LeaderF.
     <C-R> : switch between fuzzy search mode and regex mode.
     <C-F> : switch between full path search mode and name only search mode.
-    <ESC> : switch to normal mode.
+    <Tab> : switch to normal mode.
     <C-V>, <S-Insert> : paste from clipboard.
     <C-U> : clear the prompt.
     <C-J>, <Down>, <C-K>, <Up> : navigate the result list.
