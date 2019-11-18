@@ -237,7 +237,7 @@ class FileExplorer(Explorer):
                 else:
                     recurse_submodules = ""
 
-                cmd = "git ls-files %s && git ls-files --others %s %s" % (recurse_submodules, no_ignore, ignore)
+                cmd = 'git ls-files %s "%s" && git ls-files --others %s %s "%s"' % (recurse_submodules, dir, no_ignore, ignore, dir)
                 self._external_cmd = cmd
                 return cmd
             elif self._exists(dir, ".hg"):
@@ -301,7 +301,12 @@ class FileExplorer(Explorer):
             else:
                 no_ignore = ""
 
-            cmd = 'rg --no-messages --files %s %s %s %s %s "%s"' % (color, ignore, followlinks, show_hidden, no_ignore, dir)
+            if dir == '.':
+                cur_dir = ''
+            else:
+                cur_dir = '"%s"' % dir
+
+            cmd = 'rg --no-messages --files %s %s %s %s %s %s' % (color, ignore, followlinks, show_hidden, no_ignore, cur_dir)
         elif default_tool["pt"] and lfEval("executable('pt')") == '1' and os.name != 'nt': # there is bug on Windows
             wildignore = lfEval("g:Lf_WildIgnore")
             ignore = ""
@@ -355,7 +360,7 @@ class FileExplorer(Explorer):
 
             cmd = 'ag --nocolor --silent %s %s %s %s -g "" "%s"' % (ignore, followlinks, show_hidden, no_ignore, dir)
         elif default_tool["find"] and lfEval("executable('find')") == '1' \
-                and lfEval("executable('sed')") == '1':
+                and lfEval("executable('sed')") == '1' and os.name != 'nt':
             wildignore = lfEval("g:Lf_WildIgnore")
             ignore_dir = ""
             for d in wildignore["dir"]:
@@ -510,16 +515,28 @@ class FileExplorer(Explorer):
             self._writeCache(content)
 
     def getContent(self, *args, **kwargs):
+        files = kwargs.get("arguments", {}).get("--file", [])
+        if files:
+            result = []
+            for file in files:
+                with lfOpen(file, 'r', errors='ignore') as f:
+                    result += f.readlines()
+            return result
+
+        dir = os.getcwd()
+
         if kwargs.get("arguments", {}).get("directory"):
             dir = kwargs.get("arguments", {}).get("directory")[0]
             if os.path.exists(os.path.expanduser(lfDecode(dir))):
-                lfCmd("silent cd %s" % dir)
+                if lfEval("get(g:, 'Lf_NoChdir', 0)") == '0':
+                    lfCmd("silent cd %s" % dir)
+                    dir = os.getcwd()
+                else:
+                    dir = os.path.abspath(lfDecode(dir))
             else:
                 lfCmd("echohl ErrorMsg | redraw | echon "
                       "'Unknown directory `%s`' | echohl NONE" % dir)
                 return None
-
-        dir = os.getcwd()
 
         no_ignore = kwargs.get("arguments", {}).get("--no-ignore")
         if no_ignore != self._no_ignore:
@@ -535,7 +552,9 @@ class FileExplorer(Explorer):
             cmd = self._buildCmd(dir, **kwargs)
             lfCmd("let g:Lf_Debug_Cmd = '%s'" % escQuote(cmd))
 
+            lfCmd("let g:Lf_FilesFromCache = 0")
             if lfEval("g:Lf_UseCache") == '1' and kwargs.get("refresh", False) == False:
+                lfCmd("let g:Lf_FilesFromCache = 1")
                 self._content = self._getFilesFromCache()
                 if self._content:
                     return self._content
@@ -568,7 +587,7 @@ class FileExplorer(Explorer):
         return 'File'
 
     def getStlCurDir(self):
-        return escQuote(lfEncode(os.path.abspath(self._cur_dir)))
+        return escQuote(lfEncode(os.getcwd()))
 
     def supportsMulti(self):
         return True
@@ -606,28 +625,12 @@ class FileExplManager(Manager):
         help.append('" s : select multiple files')
         help.append('" a : select all files')
         help.append('" c : clear all selections')
-        help.append('" q/<Esc> : quit')
+        help.append('" p : preview the file')
+        help.append('" q : quit')
         help.append('" <F5> : refresh the cache')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
-
-    def _restoreOrigCwd(self):
-        if self._orig_cwd is None:
-            return
-
-        # https://github.com/neovim/neovim/issues/8336
-        if lfEval("has('nvim')") == '1':
-            chdir = vim.chdir
-        else:
-            chdir = os.chdir
-
-        try:
-            if int(lfEval("&autochdir")) == 0 and os.getcwd() != self._orig_cwd:
-                chdir(self._orig_cwd)
-        except:
-            if os.getcwd() != self._orig_cwd:
-                chdir(self._orig_cwd)
 
     def _nearestAncestor(self, markers, path):
         """
@@ -654,6 +657,22 @@ class FileExplManager(Manager):
 
         return ""
 
+    def _beforeExit(self):
+        super(FileExplManager, self)._beforeExit()
+        if self._timer_id is not None:
+            lfCmd("call timer_stop(%s)" % self._timer_id)
+            self._timer_id = None
+
+    def _bangEnter(self):
+        super(FileExplManager, self)._bangEnter()
+        if lfEval("exists('*timer_start')") == '0':
+            lfCmd("echohl Error | redraw | echo ' E117: Unknown function: timer_start' | echohl NONE")
+            return
+
+        self._workInIdle(bang=True)
+        if self._read_finished < 2:
+            self._timer_id = lfEval("timer_start(1, 'leaderf#File#TimerCallback', {'repeat': -1})")
+
     def startExplorer(self, win_pos, *args, **kwargs):
         if kwargs.get("arguments", {}).get("directory"): # behavior no change for `LeaderfFile <directory>`
             self._orig_cwd = None
@@ -663,12 +682,18 @@ class FileExplManager(Manager):
         self._orig_cwd = os.getcwd()
         root_markers = lfEval("g:Lf_RootMarkers")
         mode = lfEval("g:Lf_WorkingDirectoryMode")
+        working_dir = lfEval("g:Lf_WorkingDirectory")
 
         # https://github.com/neovim/neovim/issues/8336
         if lfEval("has('nvim')") == '1':
             chdir = vim.chdir
         else:
             chdir = os.chdir
+
+        if os.path.exists(working_dir) and os.path.isdir(working_dir):
+            chdir(working_dir)
+            super(FileExplManager, self).startExplorer(win_pos, *args, **kwargs)
+            return
 
         cur_buf_name = lfDecode(vim.current.buffer.name)
         fall_back = False
@@ -699,6 +724,11 @@ class FileExplManager(Manager):
                     chdir(os.path.dirname(cur_buf_name))
 
         super(FileExplManager, self).startExplorer(win_pos, *args, **kwargs)
+
+    def _previewInPopup(self, *args, **kwargs):
+        line = args[0]
+        buf_number = lfEval("bufnr('{}', 1)".format(line))
+        self._createPopupPreview(line, buf_number, 0)
 
 
 #*****************************************************

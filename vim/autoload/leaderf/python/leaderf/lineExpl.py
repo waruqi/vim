@@ -70,7 +70,11 @@ class LineExplManager(Manager):
         lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
         lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
+
+        if vim.current.window not in self._cursorline_dict:
+            self._cursorline_dict[vim.current.window] = vim.current.window.options["cursorline"]
+
+        lfCmd("setlocal cursorline")
 
     def _getDigest(self, line, mode):
         """
@@ -99,7 +103,7 @@ class LineExplManager(Manager):
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" i/<Tab> : switch to input mode')
-        help.append('" q/<Esc> : quit')
+        help.append('" q : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -114,6 +118,19 @@ class LineExplManager(Manager):
         for i in self._match_ids:
             lfCmd("silent! call matchdelete(%d)" % i)
         self._match_ids = []
+        for k, v in self._cursorline_dict.items():
+            if k.valid:
+                k.options["cursorline"] = v
+        self._cursorline_dict.clear()
+
+    def _previewInPopup(self, *args, **kwargs):
+        if len(args) == 0:
+            return
+
+        line = args[0]
+        line = line.rsplit("\t", 1)[1][1:-1]    # file:line buf_number
+        line_nr, buf_number = line.rsplit(":", 1)[1].split()
+        self._createPopupPreview(vim.buffers[int(buf_number)].name, buf_number, line_nr)
 
 
 #*****************************************************

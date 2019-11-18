@@ -3,6 +3,7 @@ import sys
 import shlex
 import signal
 import threading
+import itertools
 import subprocess
 from .utils import *
 
@@ -18,12 +19,12 @@ class AsyncExecutor(object):
     read the output asynchronously.
     """
     def __init__(self):
-        self._outQueue = Queue.Queue()
         self._errQueue = Queue.Queue()
         self._process = None
         self._finished = False
+        self._max_count = int(lfEval("g:Lf_MaxCount"))
 
-    def _readerThread(self, fd, queue, is_out):
+    def _readerThread(self, fd, queue):
         try:
             for line in iter(fd.readline, b""):
                 queue.put(line)
@@ -31,15 +32,15 @@ class AsyncExecutor(object):
             pass
         finally:
             queue.put(None)
-            if is_out:
-                self._finished = True
 
-    def execute(self, cmd, encoding=None, cleanup=None):
+    def execute(self, cmd, encoding=None, cleanup=None, env=None):
         if os.name == 'nt':
             self._process = subprocess.Popen(cmd, bufsize=-1,
+                                             stdin=subprocess.PIPE,
                                              stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE,
                                              shell=True,
+                                             env=env,
                                              universal_newlines=False)
         else:
             self._process = subprocess.Popen(cmd, bufsize=-1,
@@ -47,59 +48,106 @@ class AsyncExecutor(object):
                                              stderr=subprocess.PIPE,
                                              preexec_fn=os.setsid,
                                              shell=True,
+                                             env=env,
                                              universal_newlines=False)
 
         self._finished = False
 
-        stdout_thread = threading.Thread(target=self._readerThread,
-                                         args=(self._process.stdout, self._outQueue, True))
-        stdout_thread.daemon = True
-        stdout_thread.start()
-
         stderr_thread = threading.Thread(target=self._readerThread,
-                                         args=(self._process.stderr, self._errQueue, False))
+                                         args=(self._process.stderr, self._errQueue))
         stderr_thread.daemon = True
         stderr_thread.start()
 
-        def read(outQueue, errQueue, encoding, cleanup):
-            try:
-                if encoding:
-                    while True:
-                        try:
-                            line = outQueue.get(True, 0.01)
-                            if line is None:
-                                break
-                            yield lfBytes2Str(line.rstrip(b"\r\n"), encoding)
-                        except Queue.Empty:
-                            yield None
-                else:
-                    while True:
-                        try:
-                            line = outQueue.get(True, 0.01)
-                            if line is None:
-                                break
-                            yield lfEncode(lfBytes2Str(line.rstrip(b"\r\n")))
-                        except Queue.Empty:
-                            yield None
-
-                err = b"".join(iter(errQueue.get, None))
-                if err:
-                    raise Exception(lfBytes2Str(err, encoding))
-            finally:
+        if sys.version_info >= (3, 0):
+            def read(source):
                 try:
-                    if self._process:
-                        self._process.stdout.close()
-                except IOError:
+                    count = 0
+                    if encoding:
+                        for line in source:
+                            try:
+                                line.decode("ascii")
+                                yield line.rstrip(b"\r\n").decode()
+                            except UnicodeDecodeError:
+                                yield lfBytes2Str(line.rstrip(b"\r\n"), encoding)
+                            if self._max_count > 0:
+                                count += 1
+                                if count >= self._max_count:
+                                    self.killProcess()
+                                    break
+                    else:
+                        for line in source:
+                            try:
+                                line.decode("ascii")
+                                yield line.rstrip(b"\r\n").decode()
+                            except UnicodeDecodeError:
+                                yield lfBytes2Str(line.rstrip(b"\r\n"))
+                            if self._max_count > 0:
+                                count += 1
+                                if count >= self._max_count:
+                                    self.killProcess()
+                                    break
+
+                    err = b"".join(iter(self._errQueue.get, None))
+                    if err:
+                        raise Exception(lfBytes2Str(err, encoding))
+                except ValueError:
                     pass
+                finally:
+                    self._finished = True
+                    try:
+                        if self._process:
+                            self._process.stdout.close()
+                            self._process.stderr.close()
+                    except IOError:
+                        pass
 
-                if cleanup:
-                    cleanup()
+                    if cleanup:
+                        cleanup()
+        else:
+            def read(source):
+                try:
+                    count = 0
+                    if encoding:
+                        for line in source:
+                            yield line.rstrip(b"\r\n")
+                            if self._max_count > 0:
+                                count += 1
+                                if count >= self._max_count:
+                                    self.killProcess()
+                                    break
+                    else:
+                        for line in source:
+                            try:
+                                line.decode("ascii")
+                                yield line.rstrip(b"\r\n")
+                            except UnicodeDecodeError:
+                                yield lfEncode(line.rstrip(b"\r\n"))
+                            if self._max_count > 0:
+                                count += 1
+                                if count >= self._max_count:
+                                    self.killProcess()
+                                    break
 
-        stdout_thread.join(0.01)
+                    err = b"".join(iter(self._errQueue.get, None))
+                    if err:
+                        raise Exception(err)
+                except ValueError:
+                    pass
+                finally:
+                    self._finished = True
+                    try:
+                        if self._process:
+                            self._process.stdout.close()
+                            self._process.stderr.close()
+                    except IOError:
+                        pass
 
-        out = read(self._outQueue, self._errQueue, encoding, cleanup)
+                    if cleanup:
+                        cleanup()
 
-        return out
+        result = AsyncExecutor.Result(read(iter(self._process.stdout.readline, b"")))
+
+        return result
 
     def killProcess(self):
         # Popen.poll always returns None, bug?
@@ -114,6 +162,25 @@ class AsyncExecutor(object):
                     pass
 
             self._process = None
+
+    class Result(object):
+        def __init__(self, iterable):
+            self._g = iterable
+
+        def __add__(self, iterable):
+            self._g = itertools.chain(self._g, iterable)
+            return self
+
+        def __iadd__(self, iterable):
+            self._g = itertools.chain(self._g, iterable)
+            return self
+
+        def join_left(self, iterable):
+            self._g = itertools.chain(iterable, self._g)
+            return self
+
+        def __iter__(self):
+            return self._g
 
 
 if __name__ == "__main__":

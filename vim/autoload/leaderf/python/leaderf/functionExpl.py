@@ -6,7 +6,6 @@ import re
 import os
 import sys
 import os.path
-import subprocess
 import tempfile
 import itertools
 import multiprocessing
@@ -29,7 +28,7 @@ class FunctionExplorer(Explorer):
                 "aspvbs": "--asp-kinds=f",
                 "awk": "--awk-kinds=f",
                 "c": "--c-kinds=fp",
-                "cpp": "--c++-kinds=fp",
+                "cpp": "--c++-kinds=fp --language-force=C++",
                 "cs": "--c#-kinds=m",
                 "erlang": "--erlang-kinds=f",
                 "fortran": "--fortran-kinds=f",
@@ -106,7 +105,7 @@ class FunctionExplorer(Explorer):
                 yield list(itertools.chain(func_list, itertools.chain.from_iterable(exe_taglist)))
 
     def _getFunctionResult(self, buffer):
-        if not buffer.name:
+        if not buffer.name or lfEval("bufloaded(%d)" % buffer.number) == '0':
             return []
         changedtick = int(lfEval("getbufvar(%d, 'changedtick')" % buffer.number))
         # there is no change since last call
@@ -142,7 +141,7 @@ class FunctionExplorer(Explorer):
         return (buffer, result)
 
     def _formatResult(self, buffer, result):
-        if not buffer.name:
+        if not buffer.name or lfEval("bufloaded(%d)" % buffer.number) == '0':
             return []
 
         # a list of [tag, file, line, kind]
@@ -230,10 +229,18 @@ class FunctionExplManager(Manager):
         # {kind} {code} {file} {line}
         line = line.rsplit("\t", 1)[1][1:-1]    # file:line buf_number
         line_nr, buf_number = line.rsplit(":", 1)[1].split()
-        lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
+        if kwargs.get("mode", '') == 't':
+            buf_name = lfEval("bufname(%s)" % buf_number)
+            lfCmd("tab drop %s | %s" % (escSpecial(buf_name), line_nr))
+        else:
+            lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
         lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
+
+        if vim.current.window not in self._cursorline_dict:
+            self._cursorline_dict[vim.current.window] = vim.current.window.options["cursorline"]
+
+        lfCmd("setlocal cursorline")
 
     def _getDigest(self, line, mode):
         """
@@ -273,7 +280,7 @@ class FunctionExplManager(Manager):
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" i/<Tab> : switch to input mode')
         help.append('" p : preview the result')
-        help.append('" q/<Esc> : quit')
+        help.append('" q : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -298,6 +305,13 @@ class FunctionExplManager(Manager):
         for i in self._match_ids:
             lfCmd("silent! call matchdelete(%d)" % i)
         self._match_ids = []
+        if self._timer_id is not None:
+            lfCmd("call timer_stop(%s)" % self._timer_id)
+            self._timer_id = None
+        for k, v in self._cursorline_dict.items():
+            if k.valid:
+                k.options["cursorline"] = v
+        self._cursorline_dict.clear()
 
     def _supportsRefine(self):
         return True
@@ -306,10 +320,16 @@ class FunctionExplManager(Manager):
         self._getExplorer().removeCache(buf_number)
 
     def _previewResult(self, preview):
+        self._closePreviewPopup()
+
         if not self._needPreview(preview):
             return
 
         line = self._getInstance().currentLine
+        if self._preview_in_popup:
+            self._previewInPopup(line)
+            return
+
         orig_pos = self._getInstance().getOriginalPos()
         cur_pos = (vim.current.tabpage, vim.current.window, vim.current.buffer)
 
@@ -323,10 +343,24 @@ class FunctionExplManager(Manager):
             vim.options['eventignore'] = saved_eventignore
 
     def _bangEnter(self):
+        super(FunctionExplManager, self)._bangEnter()
+        if "--all" in self._arguments and not self._is_content_list:
+            if lfEval("exists('*timer_start')") == '0':
+                lfCmd("echohl Error | redraw | echo ' E117: Unknown function: timer_start' | echohl NONE")
+                return
+            self._callback(bang=True)
+            if self._read_finished < 2:
+                self._timer_id = lfEval("timer_start(1, 'leaderf#Function#TimerCallback', {'repeat': -1})")
+        else:
+            self._relocateCursor()
+
+    def _bangReadFinished(self):
         self._relocateCursor()
 
     def _relocateCursor(self):
         inst = self._getInstance()
+        if inst.empty():
+            return
         orig_buf_nr = inst.getOriginalPos()[2].number
         orig_line = inst.getOriginalCursor()[0]
         tags = []
@@ -336,6 +370,10 @@ class FunctionExplManager(Manager):
             line_nr, buf_number = int(line_nr), int(buf_number)
             if orig_buf_nr == buf_number:
                 tags.append((index, buf_number, line_nr))
+
+        if self._getInstance().isReverseOrder():
+            tags = tags[::-1]
+
         last = len(tags) - 1
         while last >= 0:
             if tags[last][2] <= orig_line:
@@ -345,6 +383,17 @@ class FunctionExplManager(Manager):
             index = tags[last][0]
             lfCmd(str(index))
             lfCmd("norm! zz")
+
+    def _previewInPopup(self, *args, **kwargs):
+        if len(args) == 0:
+            return
+
+        line = args[0]
+        # {kind} {code} {file} {line}
+        line = line.rsplit("\t", 1)[1][1:-1]    # file:line buf_number
+        line_nr, buf_number = line.rsplit(":", 1)[1].split()
+
+        self._createPopupPreview("", buf_number, line_nr)
 
 
 #*****************************************************

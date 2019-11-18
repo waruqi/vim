@@ -16,20 +16,37 @@ from .manager import *
 class TagExplorer(Explorer):
     def __init__(self):
         self._tag_list = []
+        self._file_tags = {}    # a dict with (key, value) = (tag file name, [mtime,taglist])
 
     def getContent(self, *args, **kwargs):
-        if self._tag_list:
-            return self._tag_list
-        else:
-            return self.getFreshContent()
+        return self.getFreshContent(*args, **kwargs)
 
     def getFreshContent(self, *args, **kwargs):
-        self._tag_list = []
+        has_new_tagfile = False
+        has_changed_tagfile = False
+        filenames = [name for name in self._file_tags]
         for tagfile in vim.eval("tagfiles()"):
-            with lfOpen(os.path.abspath(tagfile), 'r', errors='ignore') as f:
-                taglist = f.readlines()
-                self._tag_list.extend(taglist[6:])
-        return self._tag_list
+            tagfile = os.path.abspath(tagfile)
+            mtime = os.path.getmtime(tagfile)
+            if tagfile not in self._file_tags:
+                has_new_tagfile = True
+                with lfOpen(tagfile, 'r', errors='ignore') as f:
+                    self._file_tags[tagfile] = [mtime, f.readlines()[6:]]
+            else:
+                filenames.remove(tagfile)
+                if mtime != self._file_tags[tagfile][0]:
+                    has_changed_tagfile = True
+                    with lfOpen(tagfile, 'r', errors='ignore') as f:
+                        self._file_tags[tagfile] = [mtime, f.readlines()[6:]]
+
+        for name in filenames:
+            del self._file_tags[name]
+
+        if has_new_tagfile == False and has_changed_tagfile == False:
+            return self._tag_list
+        else:
+            self._tag_list = list(itertools.chain.from_iterable((i[1] for i in self._file_tags.values())))
+            return self._tag_list
 
     def getStlCategory(self):
         return 'Tag'
@@ -61,7 +78,10 @@ class TagExplManager(Manager):
         res = right.split(';"\t', 1)
         tagaddress = res[0]
         try:
-            lfCmd("hide edit %s" % escSpecial(tagfile))
+            if kwargs.get("mode", '') == 't':
+                lfCmd("tab drop %s" % escSpecial(tagfile))
+            else:
+                lfCmd("hide edit %s" % escSpecial(tagfile))
         except vim.error as e: # E37
             lfPrintError(e)
 
@@ -91,7 +111,11 @@ class TagExplManager(Manager):
         if lfEval("search('\V%s', 'wc')" % escQuote(tagname)) == '0':
             lfCmd("norm! ^")
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
+
+        if vim.current.window not in self._cursorline_dict:
+            self._cursorline_dict[vim.current.window] = vim.current.window.options["cursorline"]
+
+        lfCmd("setlocal cursorline")
 
     def _getDigest(self, line, mode):
         """
@@ -101,9 +125,7 @@ class TagExplManager(Manager):
                   1, return the name only
                   2, return the directory name
         """
-        if not line:
-            return ''
-        return line.split('\t', 1)[0]
+        return line[:line.find('\t')]
 
     def _getDigestStartPos(self, line, mode):
         """
@@ -122,7 +144,7 @@ class TagExplManager(Manager):
         help.append('" v : open file under cursor in a vertically split window')
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" i/<Tab> : switch to input mode')
-        help.append('" q/<Esc> : quit')
+        help.append('" q : quit')
         help.append('" <F5> : refresh the cache')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
@@ -144,6 +166,10 @@ class TagExplManager(Manager):
         for i in self._match_ids:
             lfCmd("silent! call matchdelete(%d)" % i)
         self._match_ids = []
+        for k, v in self._cursorline_dict.items():
+            if k.valid:
+                k.options["cursorline"] = v
+        self._cursorline_dict.clear()
 
 
 #*****************************************************

@@ -118,7 +118,11 @@ class BufExplManager(Manager):
             return
         line = args[0]
         buf_number = int(re.sub(r"^.*?(\d+).*$", r"\1", line))
-        lfCmd("hide buffer %d" % buf_number)
+        if kwargs.get("mode", '') == 't':
+            buf_name = lfEval("bufname(%s)" % buf_number)
+            lfCmd("tab drop %s" % escSpecial(buf_name))
+        else:
+            lfCmd("hide buffer %d" % buf_number)
 
     def _getDigest(self, line, mode):
         """
@@ -172,7 +176,7 @@ class BufExplManager(Manager):
         help.append('" d : wipe out buffer under cursor')
         help.append('" D : delete buffer under cursor')
         help.append('" i/<Tab> : switch to input mode')
-        help.append('" q/<Esc> : quit')
+        help.append('" q : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -206,6 +210,10 @@ class BufExplManager(Manager):
         del vim.current.line
         lfCmd("setlocal nomodifiable")
 
+    def _previewInPopup(self, *args, **kwargs):
+        line = args[0]
+        buf_number = int(re.sub(r"^.*?(\d+).*$", r"\1", line))
+        self._createPopupPreview(vim.buffers[buf_number].name, buf_number, 0)
 
 
 #*****************************************************

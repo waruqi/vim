@@ -35,16 +35,27 @@ class LfInstance(object):
         self._win_height = float(lfEval("g:Lf_WindowHeight"))
         self._show_tabline = int(lfEval("&showtabline"))
         self._is_autocmd_set = False
+        self._reverse_order = lfEval("get(g:, 'Lf_ReverseOrder', 0)") == '1'
+        self._last_reverse_order = self._reverse_order
         self._orig_pos = () # (tabpage, window, buffer)
-        self._initStlVar()
+        self._running_status = 0
+        self._cursor_row = None
+        self._help_length = None
+        self._current_working_directory = None
+        self._cur_buffer_name_ignored = False
+        self._ignore_cur_buffer_name = lfEval("get(g:, 'Lf_IgnoreCurrentBufferName', 0)") == '1' \
+                                            and self._category in ["File"]
         self._highlightStl()
 
     def _initStlVar(self):
-        lfCmd("let g:Lf_{}_StlCategory = '-'".format(self._category))
-        lfCmd("let g:Lf_{}_StlMode = '-'".format(self._category))
-        lfCmd("let g:Lf_{}_StlCwd= '-'".format(self._category))
-        lfCmd("let g:Lf_{}_StlTotal = '0'".format(self._category))
-        lfCmd("let g:Lf_{}_StlResultsCount = '0'".format(self._category))
+        if int(lfEval("!exists('g:Lf_{}_StlCategory')".format(self._category))):
+            lfCmd("let g:Lf_{}_StlCategory = '-'".format(self._category))
+            lfCmd("let g:Lf_{}_StlMode = '-'".format(self._category))
+            lfCmd("let g:Lf_{}_StlCwd= '-'".format(self._category))
+            lfCmd("let g:Lf_{}_StlRunning = ':'".format(self._category))
+            lfCmd("let g:Lf_{}_StlTotal = '0'".format(self._category))
+            lfCmd("let g:Lf_{}_StlLineNumber = '1'".format(self._category))
+            lfCmd("let g:Lf_{}_StlResultsCount = '0'".format(self._category))
 
         stl = "%#Lf_hl_{0}_stlName# LeaderF "
         stl += "%#Lf_hl_{0}_stlSeparator0#%{{g:Lf_StlSeparator.left}}"
@@ -56,9 +67,12 @@ class LfInstance(object):
         stl += "%#Lf_hl_{0}_stlSeparator3#%{{g:Lf_StlSeparator.left}}"
         stl += "%=%#Lf_hl_{0}_stlBlank#"
         stl += "%#Lf_hl_{0}_stlSeparator4#%{{g:Lf_StlSeparator.right}}"
-        stl += "%#Lf_hl_{0}_stlLineInfo# %l/%{{g:Lf_{0}_StlResultsCount}} "
+        if self._reverse_order:
+            stl += "%#Lf_hl_{0}_stlLineInfo# %{{g:Lf_{0}_StlLineNumber}}/%{{g:Lf_{0}_StlResultsCount}} "
+        else:
+            stl += "%#Lf_hl_{0}_stlLineInfo# %l/%{{g:Lf_{0}_StlResultsCount}} "
         stl += "%#Lf_hl_{0}_stlSeparator5#%{{g:Lf_StlSeparator.right}}"
-        stl += "%#Lf_hl_{0}_stlTotal# Total: %{{g:Lf_{0}_StlTotal}} "
+        stl += "%#Lf_hl_{0}_stlTotal# Total%{{g:Lf_{0}_StlRunning}} %{{g:Lf_{0}_StlTotal}} "
         self._stl = stl.format(self._category)
 
     def _highlightStl(self):
@@ -71,18 +85,25 @@ class LfInstance(object):
         lfCmd("setlocal undolevels=-1")
         lfCmd("setlocal noswapfile")
         lfCmd("setlocal nolist")
-        lfCmd("setlocal number")
         lfCmd("setlocal norelativenumber")
         lfCmd("setlocal nospell")
         lfCmd("setlocal wrap")
         lfCmd("setlocal nofoldenable")
-        lfCmd("setlocal foldcolumn=0")
         lfCmd("setlocal foldmethod=manual")
         lfCmd("setlocal shiftwidth=4")
         lfCmd("setlocal cursorline")
+        if self._reverse_order:
+            lfCmd("setlocal nonumber")
+            lfCmd("setlocal foldcolumn=1")
+            lfCmd("setlocal winfixheight")
+        else:
+            lfCmd("setlocal number")
+            lfCmd("setlocal foldcolumn=0")
+            lfCmd("setlocal nowinfixheight")
         lfCmd("setlocal filetype=leaderf")
 
     def _setStatusline(self):
+        self._initStlVar()
         self.window.options["statusline"] = self._stl
         lfCmd("redrawstatus")
         if not self._is_autocmd_set:
@@ -97,15 +118,32 @@ class LfInstance(object):
     def _createBufWindow(self, win_pos):
         self._win_pos = win_pos
 
+        saved_eventignore = vim.options['eventignore']
+        vim.options['eventignore'] = 'all'
+        try:
+            orig_win = vim.current.window
+            for w in vim.windows:
+                vim.current.window = w
+                if lfEval("exists('w:lf_win_view')") == '0':
+                    lfCmd("let w:lf_win_view = {}")
+                lfCmd("let w:lf_win_view['%s'] = winsaveview()" % self._category)
+        finally:
+            vim.current.window = orig_win
+            vim.options['eventignore'] = saved_eventignore
+
         if win_pos != 'fullScreen':
             self._restore_sizes = lfEval("winrestcmd()")
+            self._orig_win_count = len(vim.windows)
 
         """
         https://github.com/vim/vim/issues/1737
         https://github.com/vim/vim/issues/1738
         """
         # clear the buffer first to avoid a flash
-        if self._buffer_object and lfEval("g:Lf_RememberLastSearch") == '0':
+        if self._buffer_object is not None and self._buffer_object.valid \
+                and lfEval("g:Lf_RememberLastSearch") == '0' \
+                and "--append" not in self._arguments \
+                and "--recall" not in self._arguments:
             self.buffer.options['modifiable'] = True
             del self._buffer_object[:]
 
@@ -142,18 +180,39 @@ class LfInstance(object):
         else:
             lfCmd("echoe 'Wrong value of g:Lf_WindowPosition'")
 
+        lfCmd("doautocmd WinEnter")
+
         self._tabpage_object = vim.current.tabpage
         self._window_object = vim.current.window
-        if self._buffer_object is None:
+        self._initial_win_height = self._window_object.height
+        if self._reverse_order and "--recall" not in self._arguments:
+            self._window_object.height = 1
+
+        if self._buffer_object is None or not self._buffer_object.valid:
             self._buffer_object = vim.current.buffer
             lfCmd("augroup Lf_{}_Colorscheme".format(self._category))
+            lfCmd("autocmd!")
             lfCmd("autocmd ColorScheme * call leaderf#colorscheme#highlight('{}')"
                   .format(self._category))
             lfCmd("autocmd ColorScheme * call leaderf#colorscheme#highlightMode('{0}', g:Lf_{0}_StlMode)"
                   .format(self._category))
             lfCmd("autocmd ColorScheme <buffer> doautocmd syntax")
+            lfCmd("autocmd CursorMoved <buffer> let g:Lf_{}_StlLineNumber = 1 + line('$') - line('.')"
+                  .format(self._category))
             lfCmd("autocmd VimResized * let g:Lf_VimResized = 1")
             lfCmd("augroup END")
+
+        saved_eventignore = vim.options['eventignore']
+        vim.options['eventignore'] = 'all'
+        try:
+            orig_win = vim.current.window
+            for w in vim.windows:
+                vim.current.window = w
+                if lfEval("exists('w:lf_win_view')") != '0' and lfEval("has_key(w:lf_win_view, '%s')" % self._category) != '0':
+                    lfCmd("call winrestview(w:lf_win_view['%s'])" % self._category)
+        finally:
+            vim.current.window = orig_win
+            vim.options['eventignore'] = saved_eventignore
 
     def _enterOpeningBuffer(self):
         if (self._tabpage_object and self._tabpage_object.valid
@@ -164,6 +223,20 @@ class LfInstance(object):
             self._after_enter()
             return True
         return False
+
+    def setArguments(self, arguments):
+        self._last_reverse_order = self._reverse_order
+        self._arguments = arguments
+        if "--reverse" in self._arguments or lfEval("get(g:, 'Lf_ReverseOrder', 0)") == '1':
+            self._reverse_order = True
+        else:
+            self._reverse_order = False
+
+    def ignoreReverse(self):
+        self._reverse_order = False
+
+    def useLastReverseOrder(self):
+        self._reverse_order = self._last_reverse_order
 
     def setStlCategory(self, category):
         lfCmd("let g:Lf_{}_StlCategory = '{}'".format(self._category, category) )
@@ -179,15 +252,36 @@ class LfInstance(object):
     def setStlTotal(self, total):
         lfCmd("let g:Lf_{}_StlTotal = '{}'".format(self._category, total))
 
-    def setStlResultsCount(self, count):
+    def setStlResultsCount(self, count, check_ignored=False):
+        if check_ignored and self._cur_buffer_name_ignored:
+            count -= 1
         lfCmd("let g:Lf_{}_StlResultsCount = '{}'".format(self._category, count))
+        if lfEval("has('nvim')") == '1':
+            lfCmd("redrawstatus")
+
+    def setStlRunning(self, running):
+        if running:
+            status = (':', ' ')
+            lfCmd("let g:Lf_{}_StlRunning = '{}'".format(self._category, status[self._running_status]))
+            self._running_status = (self._running_status + 1) & 1
+        else:
+            self._running_status = 0
+            lfCmd("let g:Lf_{}_StlRunning = ':'".format(self._category))
 
     def enterBuffer(self, win_pos):
         if self._enterOpeningBuffer():
             return
 
+        lfCmd("let g:Lf_{}_StlLineNumber = '1'".format(self._category))
         self._orig_pos = (vim.current.tabpage, vim.current.window, vim.current.buffer)
         self._orig_cursor = vim.current.window.cursor
+        self._orig_buffer_name = os.path.normpath(lfDecode(vim.current.buffer.name))
+        if lfEval("g:Lf_ShowRelativePath") == '1':
+            try:
+                self._orig_buffer_name = os.path.relpath(self._orig_buffer_name)
+            except ValueError:
+                pass
+        self._orig_buffer_name = lfEncode(self._orig_buffer_name)
 
         self._before_enter()
 
@@ -198,6 +292,7 @@ class LfInstance(object):
             self._createBufWindow(win_pos)
         else:
             self._orig_win_nr = vim.current.window.number
+            self._orig_win_id = lfWinId(self._orig_win_nr)
             self._createBufWindow(win_pos)
         self._setAttributes()
         self._setStatusline()
@@ -216,11 +311,28 @@ class LfInstance(object):
 
             lfCmd("set showtabline=%d" % self._show_tabline)
         else:
+            saved_eventignore = vim.options['eventignore']
+            vim.options['eventignore'] = 'all'
+            try:
+                orig_win = vim.current.window
+                for w in vim.windows:
+                    vim.current.window = w
+                    if lfEval("exists('w:lf_win_view')") == '0':
+                        lfCmd("let w:lf_win_view = {}")
+                    lfCmd("let w:lf_win_view['%s'] = winsaveview()" % self._category)
+            finally:
+                vim.current.window = orig_win
+                vim.options['eventignore'] = saved_eventignore
+
             if len(vim.windows) > 1:
                 lfCmd("silent! hide")
-                # 'silent!' is used to skip error E16.
-                lfCmd("silent! exec '%d wincmd w'" % self._orig_win_nr)
-                if lfEval("get(g:, 'Lf_VimResized', 0)") == '0':
+                if self._orig_win_id is not None:
+                    lfCmd("call win_gotoid(%d)" % self._orig_win_id)
+                else:
+                    # 'silent!' is used to skip error E16.
+                    lfCmd("silent! exec '%d wincmd w'" % self._orig_win_nr)
+                if lfEval("get(g:, 'Lf_VimResized', 0)") == '0' \
+                        and self._orig_win_count == len(vim.windows):
                     lfCmd(self._restore_sizes) # why this line does not take effect?
                                                # it's weird. repeat 4 times
                     lfCmd(self._restore_sizes) # fix issue #102
@@ -230,49 +342,171 @@ class LfInstance(object):
             else:
                 lfCmd("bd")
 
+            saved_eventignore = vim.options['eventignore']
+            vim.options['eventignore'] = 'all'
+            try:
+                orig_win = vim.current.window
+                for w in vim.windows:
+                    vim.current.window = w
+                    if lfEval("exists('w:lf_win_view')") != '0' and lfEval("has_key(w:lf_win_view, '%s')" % self._category) != '0':
+                        lfCmd("call winrestview(w:lf_win_view['%s'])" % self._category)
+            finally:
+                vim.current.window = orig_win
+                vim.options['eventignore'] = saved_eventignore
+
         lfCmd("echo")
 
         self._after_exit()
 
-    def setBuffer(self, content):
+    def _actualLength(self, buffer):
+        num = 0
+        columns = int(lfEval("&columns"))
+        for i in buffer:
+            num += (int(lfEval("strdisplaywidth('%s')" % escQuote(i))) + columns - 1)// columns
+        return num
+
+    def setBuffer(self, content, need_copy=False):
+        self._cur_buffer_name_ignored = False
+        if self._ignore_cur_buffer_name:
+            if self._orig_buffer_name in content[:self._window_object.height]:
+                self._cur_buffer_name_ignored = True
+                if need_copy:
+                    content = content[:]
+                content.remove(self._orig_buffer_name)
+            elif os.name == 'nt':
+                buffer_name = self._orig_buffer_name.replace('\\', '/')
+                if buffer_name in content[:self._window_object.height]:
+                    self._cur_buffer_name_ignored = True
+                    if need_copy:
+                        content = content[:]
+                    content.remove(buffer_name)
+
         self.buffer.options['modifiable'] = True
-        # if lfEval("has('nvim')") == '1':
-        #     # NvimError: string cannot contain newlines
-        #     content = [ line.rstrip("\r\n") for line in content ]
-        self._buffer_object[:] = content
+        if lfEval("has('nvim')") == '1':
+            if len(content) > 0 and len(content[0]) != len(content[0].rstrip("\r\n")):
+                # NvimError: string cannot contain newlines
+                content = [ line.rstrip("\r\n") for line in content ]
+        try:
+            if self._reverse_order:
+                orig_row = self._window_object.cursor[0]
+                orig_buf_len = len(self._buffer_object)
+
+                self._buffer_object[:] = content[::-1]
+                buffer_len = len(self._buffer_object)
+                if buffer_len < self._initial_win_height:
+                    if "--nowrap" not in self._arguments:
+                        self._window_object.height = min(self._initial_win_height, self._actualLength(self._buffer_object))
+                    else:
+                        self._window_object.height = buffer_len
+                elif self._window_object.height < self._initial_win_height:
+                    self._window_object.height = self._initial_win_height
+
+                try:
+                    self._window_object.cursor = (orig_row + buffer_len - orig_buf_len, 0)
+                    # if self._window_object.cursor == (buffer_len, 0):
+                    #     lfCmd("normal! zb")
+                except vim.error:
+                    self._window_object.cursor = (buffer_len, 0)
+                    # lfCmd("normal! zb")
+
+                self.setLineNumber()
+            else:
+                self._buffer_object[:] = content
+        finally:
+            self.buffer.options['modifiable'] = False
+
+    def appendBuffer(self, content):
+        self.buffer.options['modifiable'] = True
+        if lfEval("has('nvim')") == '1':
+            if len(content) > 0 and len(content[0]) != len(content[0].rstrip("\r\n")):
+                # NvimError: string cannot contain newlines
+                content = [ line.rstrip("\r\n") for line in content ]
+
+        try:
+            if self._reverse_order:
+                orig_row = self._window_object.cursor[0]
+                orig_buf_len = len(self._buffer_object)
+
+                if self.empty():
+                    self._buffer_object[:] = content[::-1]
+                else:
+                    self._buffer_object.append(content[::-1], 0)
+                buffer_len = len(self._buffer_object)
+                if buffer_len < self._initial_win_height:
+                    if "--nowrap" not in self._arguments:
+                        self._window_object.height = min(self._initial_win_height, self._actualLength(self._buffer_object))
+                    else:
+                        self._window_object.height = buffer_len
+                elif self._window_object.height < self._initial_win_height:
+                    self._window_object.height = self._initial_win_height
+
+                try:
+                    self._window_object.cursor = (orig_row + buffer_len - orig_buf_len, 0)
+                    # if self._window_object.cursor == (buffer_len, 0):
+                    #     lfCmd("normal! zb")
+                except vim.error:
+                    self._window_object.cursor = (buffer_len, 0)
+                    # lfCmd("normal! zb")
+
+                self.setLineNumber()
+            else:
+                if self.empty():
+                    self._buffer_object[:] = content
+                else:
+                    self._buffer_object.append(content)
+        finally:
+            self.buffer.options['modifiable'] = False
+
+    def clearBuffer(self):
+        self.buffer.options['modifiable'] = True
+        if self._buffer_object and self._buffer_object.valid:
+            del self._buffer_object[:]
+        self.buffer.options['modifiable'] = False
 
     def appendLine(self, line):
         self._buffer_object.append(line)
 
     def initBuffer(self, content, unit, set_content):
         if isinstance(content, list):
-            self.setBuffer(content)
+            self.setBuffer(content, need_copy=True)
             self.setStlTotal(len(content)//unit)
-            return
+            self.setStlResultsCount(len(content)//unit, True)
+            return content
 
         self.buffer.options['modifiable'] = True
         self._buffer_object[:] = []
 
         try:
             start = time.time()
+            status_start = start
+            cur_content = []
             for line in content:
-                if line is None:
-                    continue
-                if self.empty():
-                    self._buffer_object[0] = line
-                else:
-                    self._buffer_object.append(line)
+                cur_content.append(line)
                 if time.time() - start > 0.1:
                     start = time.time()
-                    self.setStlTotal(len(self._buffer_object)//unit)
+                    if len(self._buffer_object) <= self._window_object.height:
+                        self.setBuffer(cur_content, need_copy=True)
+                        if self._reverse_order:
+                            lfCmd("normal! G")
+
+                    if time.time() - status_start > 0.45:
+                        status_start = time.time()
+                        self.setStlRunning(True)
+                    self.setStlTotal(len(cur_content)//unit)
+                    self.setStlResultsCount(len(cur_content)//unit)
                     lfCmd("redrawstatus")
+            self.setBuffer(cur_content, need_copy=True)
             self.setStlTotal(len(self._buffer_object)//unit)
+            self.setStlRunning(False)
+            self.setStlResultsCount(len(self._buffer_object)//unit, True)
             lfCmd("redrawstatus")
-            set_content(self.buffer[:])
+            set_content(cur_content)
         except vim.error: # neovim <C-C>
             pass
         except KeyboardInterrupt: # <C-C>
             pass
+
+        return cur_content
 
     @property
     def tabpage(self):
@@ -301,5 +535,51 @@ class LfInstance(object):
 
     def getOriginalCursor(self):
         return self._orig_cursor
+
+    def getInitialWinHeight(self):
+        if self._reverse_order:
+            return self._initial_win_height
+        else:
+            return 200
+
+    def isReverseOrder(self):
+        return self._reverse_order
+
+    def isLastReverseOrder(self):
+        return self._last_reverse_order
+
+    def setLineNumber(self):
+        if self._reverse_order:
+            line_nr = 1 + len(self._buffer_object) - self._window_object.cursor[0]
+            lfCmd("let g:Lf_{}_StlLineNumber = '{}'".format(self._category, line_nr))
+
+    def setCwd(self, cwd):
+        self._current_working_directory = cwd
+
+    def getCwd(self):
+        return self._current_working_directory
+
+    @property
+    def cursorRow(self):
+        return self._cursor_row
+
+    @cursorRow.setter
+    def cursorRow(self, row):
+        self._cursor_row = row
+
+    @property
+    def helpLength(self):
+        return self._help_length
+
+    @helpLength.setter
+    def helpLength(self, length):
+        self._help_length = length
+
+    def gotoOriginalWindow(self):
+        if self._orig_win_id is not None:
+            lfCmd("call win_gotoid(%d)" % self._orig_win_id)
+        else:
+            # 'silent!' is used to skip error E16.
+            lfCmd("silent! exec '%d wincmd w'" % self._orig_win_nr)
 
 #  vim: set ts=4 sw=4 tw=0 et :

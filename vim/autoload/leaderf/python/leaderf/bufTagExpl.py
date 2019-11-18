@@ -6,7 +6,6 @@ import re
 import os
 import sys
 import os.path
-import subprocess
 import tempfile
 import itertools
 import multiprocessing
@@ -80,7 +79,7 @@ class BufTagExplorer(Explorer):
                 yield list(itertools.chain(tag_list, itertools.chain.from_iterable(exe_taglist)))
 
     def _getTagResult(self, buffer):
-        if not buffer.name:
+        if not buffer.name or lfEval("bufloaded(%d)" % buffer.number) == '0':
             return []
         changedtick = int(lfEval("getbufvar(%d, 'changedtick')" % buffer.number))
         # there is no change since last call
@@ -93,7 +92,7 @@ class BufTagExplorer(Explorer):
             self._buf_changedtick[buffer.number] = changedtick
 
         if lfEval("getbufvar(%d, '&filetype')" % buffer.number) == "cpp":
-            extra_options = "--c++-kinds=+p"
+            extra_options = "--language-force=C++ --c++-kinds=+p"
         elif lfEval("getbufvar(%d, '&filetype')" % buffer.number) == "c":
             extra_options = "--c-kinds=+p"
         elif lfEval("getbufvar(%d, '&filetype')" % buffer.number) == "python":
@@ -124,7 +123,7 @@ class BufTagExplorer(Explorer):
         return (buffer, result)
 
     def _formatResult(self, buffer, result):
-        if not buffer.name:
+        if not buffer.name or lfEval("bufloaded(%d)" % buffer.number) == '0':
             return []
 
         # a list of [tag, file, line, kind, scope]
@@ -232,18 +231,29 @@ class BufTagExplManager(Manager):
         if line[0].isspace(): # if g:Lf_PreviewCode == 1
             buffer = args[1]
             line_nr = args[2]
-            line = buffer[line_nr - 2]
+            if self._getInstance().isReverseOrder():
+                line = buffer[line_nr]
+            else:
+                line = buffer[line_nr - 2]
         # {tag} {kind} {scope} {file}:{line} {buf_number}
         items = re.split(" *\t *", line)
         tagname = items[0]
         line_nr = items[3].rsplit(":", 1)[1]
         buf_number = items[4]
-        lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
+        if kwargs.get("mode", '') == 't':
+            buf_name = lfEval("bufname(%s)" % buf_number)
+            lfCmd("tab drop %s | %s" % (escSpecial(buf_name), line_nr))
+        else:
+            lfCmd("hide buffer +%s %s" % (line_nr, buf_number))
         if "preview" not in kwargs:
             lfCmd("norm! ^")
             lfCmd("call search('\V%s', 'Wc', line('.'))" % escQuote(tagname))
         lfCmd("norm! zz")
-        lfCmd("setlocal cursorline! | redraw | sleep 20m | setlocal cursorline!")
+
+        if vim.current.window not in self._cursorline_dict:
+            self._cursorline_dict[vim.current.window] = vim.current.window.options["cursorline"]
+
+        lfCmd("setlocal cursorline")
 
     def _getDigest(self, line, mode):
         """
@@ -283,7 +293,7 @@ class BufTagExplManager(Manager):
         help.append('" t : open file under cursor in a new tabpage')
         help.append('" i/<Tab> : switch to input mode')
         help.append('" p : preview the result')
-        help.append('" q/<Esc> : quit')
+        help.append('" q : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
@@ -308,6 +318,13 @@ class BufTagExplManager(Manager):
         for i in self._match_ids:
             lfCmd("silent! call matchdelete(%d)" % i)
         self._match_ids = []
+        if self._timer_id is not None:
+            lfCmd("call timer_stop(%s)" % self._timer_id)
+            self._timer_id = None
+        for k, v in self._cursorline_dict.items():
+            if k.valid:
+                k.options["cursorline"] = v
+        self._cursorline_dict.clear()
 
     def _getUnit(self):
         """
@@ -323,15 +340,16 @@ class BufTagExplManager(Manager):
 
     def _fuzzyFilter(self, is_full_path, get_weight, iterable):
         """
-        return a list, each item is a triple (weight, line1, line2)
+        return a list, each item is a pair (weight, (line1, line2))
         """
         if self._supports_preview:
             if len(iterable) < 2:
                 return []
             getDigest = partial(self._getDigest, mode=0 if is_full_path else 1)
-            triples = ((get_weight(getDigest(line)), line, iterable[2*i+1])
+            pairs = ((get_weight(getDigest(line)), (line, iterable[2*i+1]))
                        for i, line in enumerate(iterable[::2]))
-            return (t for t in triples if t[0])
+            MIN_WEIGHT = fuzzyMatchC.MIN_WEIGHT if is_fuzzyMatch_C else FuzzyMatch.MIN_WEIGHT
+            return (t for t in pairs if t[0] > MIN_WEIGHT)
         else:
             return super(BufTagExplManager, self)._fuzzyFilter(is_full_path,
                                                                get_weight,
@@ -344,7 +362,8 @@ class BufTagExplManager(Manager):
             getDigest = self._getDigest
             tuples = ((first_get_weight(getDigest(line, 1)), get_weight(getDigest(line, 2)),
                        line, iterable[2*i+1]) for i, line in enumerate(iterable[::2]))
-            return ((i[0] + i[1], i[2], i[3]) for i in tuples if i[0] and i[1])
+            MIN_WEIGHT = fuzzyMatchC.MIN_WEIGHT if is_fuzzyMatch_C else FuzzyMatch.MIN_WEIGHT
+            return ((i[0] + i[1], (i[2], i[3])) for i in tuples if i[0] > MIN_WEIGHT and i[1] > MIN_WEIGHT)
         else:
             return super(BufTagExplManager, self)._refineFilter(first_get_weight,
                                                                 get_weight,
@@ -371,43 +390,68 @@ class BufTagExplManager(Manager):
 
     def _getList(self, pairs):
         """
-        return a list constructed from pairs
+        return a list constructed from `pairs`
         Args:
-            pairs: a list of tuple(weight, line, ...)
+            pairs: a list of tuple(weight, (line1, line2))
         """
         if self._supports_preview:
             result = []
             for _, p in enumerate(pairs):
-                result.append(p[1])
-                result.append(p[2])
+                result.extend(p[1])
             return result
         else:
             return super(BufTagExplManager, self)._getList(pairs)
 
     def _toUp(self):
         if self._supports_preview:
-            lfCmd("norm! 2k")
+            if self._getInstance().isReverseOrder() and self._getInstance().getCurrentPos()[0] <= 3:
+                self._setResultContent()
+                if self._cli.pattern and len(self._highlight_pos) < len(self._getInstance().buffer) // 2 \
+                        and len(self._highlight_pos) < int(lfEval("g:Lf_NumberOfHighlight")):
+                    self._highlight_method()
+
+            if self._getInstance().isReverseOrder():
+                lfCmd("norm! 3kj")
+                self._getInstance().setLineNumber()
+            else:
+                lfCmd("norm! 2k")
         else:
             super(BufTagExplManager, self)._toUp()
 
+        lfCmd("setlocal cursorline!")   # these two help to redraw the statusline,
+        lfCmd("setlocal cursorline!")   # also fix a weird bug of vim
+
     def _toDown(self):
         if self._supports_preview:
-            lfCmd("norm! 3jk")
+            if self._getInstance().isReverseOrder():
+                lfCmd("norm! 2j")
+                self._getInstance().setLineNumber()
+            else:
+                lfCmd("norm! 3jk")
         else:
             super(BufTagExplManager, self)._toDown()
+
+        lfCmd("setlocal cursorline!")   # these two help to redraw the statusline,
+        lfCmd("setlocal cursorline!")   # also fix a weird bug of vim
 
     def removeCache(self, buf_number):
         self._getExplorer().removeCache(buf_number)
 
     def _previewResult(self, preview):
+        self._closePreviewPopup()
+
         if not self._needPreview(preview):
             return
 
         line = self._getInstance().currentLine
+        line_nr = self._getInstance().window.cursor[0]
+
+        if self._preview_in_popup:
+            self._previewInPopup(line, self._getInstance().buffer, line_nr)
+            return
+
         orig_pos = self._getInstance().getOriginalPos()
         cur_pos = (vim.current.tabpage, vim.current.window, vim.current.buffer)
-
-        line_nr = self._getInstance().window.cursor[0]
 
         saved_eventignore = vim.options['eventignore']
         vim.options['eventignore'] = 'BufLeave,WinEnter,BufEnter'
@@ -419,21 +463,43 @@ class BufTagExplManager(Manager):
             vim.options['eventignore'] = saved_eventignore
 
     def _bangEnter(self):
+        super(BufTagExplManager, self)._bangEnter()
+        if "--all" in self._arguments and not self._is_content_list:
+            if lfEval("exists('*timer_start')") == '0':
+                lfCmd("echohl Error | redraw | echo ' E117: Unknown function: timer_start' | echohl NONE")
+                return
+            self._callback(bang=True)
+            if self._read_finished < 2:
+                self._timer_id = lfEval("timer_start(1, 'leaderf#BufTag#TimerCallback', {'repeat': -1})")
+        else:
+            self._relocateCursor()
+
+    def _bangReadFinished(self):
         self._relocateCursor()
 
     def _relocateCursor(self):
         inst = self._getInstance()
+        if inst.empty():
+            return
         orig_buf_nr = inst.getOriginalPos()[2].number
         orig_line = inst.getOriginalCursor()[0]
         tags = []
         for index, line in enumerate(inst.buffer, 1):
-            if self._supports_preview and index & 1 == 0:
-                continue
+            if self._supports_preview:
+                if self._getInstance().isReverseOrder():
+                    if index & 1 == 1:
+                        continue
+                elif index & 1 == 0:
+                    continue
             items = re.split(" *\t *", line)
             line_nr = int(items[3].rsplit(":", 1)[1])
             buf_number = int(items[4])
             if orig_buf_nr == buf_number:
                 tags.append((index, buf_number, line_nr))
+
+        if self._getInstance().isReverseOrder():
+            tags = tags[::-1]
+
         last = len(tags) - 1
         while last >= 0:
             if tags[last][2] <= orig_line:
@@ -443,6 +509,26 @@ class BufTagExplManager(Manager):
             index = tags[last][0]
             lfCmd(str(index))
             lfCmd("norm! zz")
+
+    def _previewInPopup(self, *args, **kwargs):
+        if len(args) == 0:
+            return
+
+        line = args[0]
+        if line[0].isspace(): # if g:Lf_PreviewCode == 1
+            buffer = args[1]
+            line_nr = args[2]
+            if self._getInstance().isReverseOrder():
+                line = buffer[line_nr]
+            else:
+                line = buffer[line_nr - 2]
+        # {tag} {kind} {scope} {file}:{line} {buf_number}
+        items = re.split(" *\t *", line)
+        tagname = items[0]
+        line_nr = items[3].rsplit(":", 1)[1]
+        buf_number = items[4]
+
+        self._createPopupPreview(tagname, buf_number, line_nr)
 
 
 #*****************************************************

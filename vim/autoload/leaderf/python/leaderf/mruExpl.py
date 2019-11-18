@@ -44,6 +44,9 @@ class MruExplorer(Explorer):
         if kwargs["cb_name"] == lines[0]:
             lines = lines[1:] + lines[0:1]
 
+        if "--no-split-path" in kwargs.get("arguments", {}):
+            return lines
+
         self._max_bufname_len = max(int(lfEval("strdisplaywidth('%s')"
                                         % escQuote(getBasename(line))))
                                     for line in lines)
@@ -114,7 +117,15 @@ class MruExplManager(Manager):
         dirname = self._getDigest(line, 2)
         basename = self._getDigest(line, 1)
         try:
-            lfCmd("hide edit %s" % escSpecial(dirname + basename))
+            file = dirname + basename
+            if not os.path.isabs(file):
+                file = os.path.join(self._getInstance().getCwd(), lfDecode(file))
+                file = os.path.normpath(lfEncode(file))
+
+            if kwargs.get("mode", '') == 't':
+                lfCmd("tab drop %s" % escSpecial(file))
+            else:
+                lfCmd("hide edit %s" % escSpecial(file))
         except vim.error as e: # E37
             lfPrintError(e)
 
@@ -128,15 +139,24 @@ class MruExplManager(Manager):
         """
         if not line:
             return ''
-        prefix_len = self._getExplorer().getPrefixLength()
-        if mode == 0:
-            return line[prefix_len:]
-        elif mode == 1:
-            start_pos = line.find(' "') # what if there is " in file name?
-            return line[prefix_len:start_pos].rstrip()
+
+        if "--no-split-path" in self._arguments:
+            if mode == 0:
+                return line
+            elif mode == 1:
+                return getBasename(line)
+            else:
+                return getDirname(line)
         else:
-            start_pos = line.find(' "') # what if there is " in file name?
-            return line[start_pos+2 : -1]
+            prefix_len = self._getExplorer().getPrefixLength()
+            if mode == 0:
+                return line[prefix_len:]
+            elif mode == 1:
+                start_pos = line.find(' "') # what if there is " in file name?
+                return line[prefix_len:start_pos].rstrip()
+            else:
+                start_pos = line.find(' "') # what if there is " in file name?
+                return line[start_pos+2 : -1]
 
     def _getDigestStartPos(self, line, mode):
         """
@@ -148,14 +168,20 @@ class MruExplManager(Manager):
         """
         if not line:
             return 0
-        prefix_len = self._getExplorer().getPrefixLength()
-        if mode == 0:
-            return prefix_len
-        elif mode == 1:
-            return prefix_len
+        if "--no-split-path" in self._arguments:
+            if mode == 0 or mode == 2:
+                return 0
+            else:
+                return lfBytesLen(getDirname(line))
         else:
-            start_pos = line.find(' "') # what if there is " in file name?
-            return lfBytesLen(line[:start_pos+2])
+            prefix_len = self._getExplorer().getPrefixLength()
+            if mode == 0:
+                return prefix_len
+            elif mode == 1:
+                return prefix_len
+            else:
+                start_pos = line.find(' "') # what if there is " in file name?
+                return lfBytesLen(line[:start_pos+2])
 
     def _createHelp(self):
         help = []
@@ -168,15 +194,17 @@ class MruExplManager(Manager):
         help.append('" s : select multiple files')
         help.append('" a : select all files')
         help.append('" c : clear all selections')
-        help.append('" q/<Esc> : quit')
+        help.append('" p : preview the file')
+        help.append('" q : quit')
         help.append('" <F1> : toggle this help')
         help.append('" ---------------------------------------------------------')
         return help
 
     def _afterEnter(self):
         super(MruExplManager, self)._afterEnter()
-        id = int(lfEval('''matchadd('Lf_hl_bufDirname', ' \zs".*"$')'''))
-        self._match_ids.append(id)
+        if "--no-split-path" not in self._arguments:
+            id = int(lfEval('''matchadd('Lf_hl_bufDirname', ' \zs".*"$')'''))
+            self._match_ids.append(id)
 
     def _beforeExit(self):
         super(MruExplManager, self)._beforeExit()
@@ -194,8 +222,26 @@ class MruExplManager(Manager):
         self._explorer.delFromCache(dirname + basename)
         if len(self._content) > 0:
             self._content.remove(line)
-        del vim.current.line
+        # `del vim.current.line` does not work in neovim
+        # https://github.com/neovim/neovim/issues/9361
+        del vim.current.buffer[vim.current.window.cursor[0] - 1]
         lfCmd("setlocal nomodifiable")
+
+    def _previewInPopup(self, *args, **kwargs):
+        if len(args) == 0:
+            return
+
+        line = args[0]
+        dirname = self._getDigest(line, 2)
+        basename = self._getDigest(line, 1)
+
+        file = dirname + basename
+        if not os.path.isabs(file):
+            file = os.path.join(self._getInstance().getCwd(), lfDecode(file))
+            file = os.path.normpath(lfEncode(file))
+
+        buf_number = lfEval("bufnr('{}', 1)".format(file))
+        self._createPopupPreview(file, buf_number, 0)
 
 
 #*****************************************************

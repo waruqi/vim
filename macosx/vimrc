@@ -386,6 +386,9 @@ let g:wildfire_objects = ["iw", "i'", 'i"', "i)", "i]", "i}", "ip", "it"]
 let g:wildfire_fuel_map = "<Enter>"
 let g:wildfire_water_map = "<Space>"
 
+" leaderf
+let g:Lf_CommandMap = {'<C-K>': ['<Up>'], '<C-J>': ['<Down>']}
+
 """"""""""""""""""""""""""""""""""""""
 " 其他设置
 """"""""""""""""""""""""""""""""""""""

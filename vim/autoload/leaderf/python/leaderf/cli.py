@@ -6,8 +6,8 @@ import re
 import time
 from datetime import datetime
 from functools import wraps
+from collections import OrderedDict
 from .utils import *
-
 
 def cursorController(func):
     @wraps(func)
@@ -48,8 +48,10 @@ class LfCli(object):
         self._cmd_map = lfEval("g:Lf_CommandMap")
         self._refine = False
         self._delimiter = lfEval("g:Lf_DelimiterChar")
+        self._and_delimiter = lfEval("get(g:, 'Lf_AndDelimiter', ' ')")
         self._supports_nameonly = False
         self._supports_refine = False
+        self._is_and_mode = False
         self._setDefaultMode()
 
     def _setDefaultMode(self):
@@ -125,11 +127,37 @@ class LfCli(object):
     def setPattern(self, pattern):
         if pattern:
             self.clear()
-        for ch in pattern:
-            self._insert(ch)
+        self._cmdline = list(pattern)
+        self._cursor_pos = len(self._cmdline)
         self._buildPattern()
 
+    # https://github.com/neovim/neovim/issues/6538
+    def _buildNvimPrompt(self):
+        lfCmd("redraw")
+        if self._is_fuzzy:
+            if self._is_full_path:
+                lfCmd("echohl Constant | echon '>F> ' | echohl NONE")
+            else:
+                lfCmd("echohl Constant | echon '>>> ' | echohl NONE")
+        else:
+            lfCmd("echohl Constant | echon 'R>> ' | echohl NONE")
+
+        lfCmd("echohl Normal | echon '%s' | echohl NONE" %
+              escQuote(''.join(self._cmdline[:self._cursor_pos])))
+        if self._cursor_pos < len(self._cmdline):
+            lfCmd("hi! default link Lf_hl_cursor Cursor")
+            lfCmd("echohl Lf_hl_cursor | echon '%s' | echohl NONE" %
+                  escQuote(''.join(self._cmdline[self._cursor_pos])))
+            lfCmd("echohl Normal | echon '%s' | echohl NONE" %
+                  escQuote(''.join(self._cmdline[self._cursor_pos+1:])))
+        else:
+            lfCmd("hi! default link Lf_hl_cursor NONE")
+
     def _buildPrompt(self):
+        if lfEval("has('nvim')") == '1':
+            self._buildNvimPrompt()
+            return
+
         delta_time = datetime.now() - self._start_time
         delta_ms = delta_time.microseconds + (delta_time.seconds +
                    delta_time.days * 24 * 3600) * 10**6
@@ -140,9 +168,12 @@ class LfCli(object):
                 lfCmd("hi! default link Lf_hl_cursor Cursor")
             else:
                 lfCmd("hi! default link Lf_hl_cursor NONE")
+
             if lfEval("g:Lf_CursorBlink") == '1':
                 self._start_time = datetime.now()
                 self._blinkon = not self._blinkon
+            elif self._idle:
+                return
 
         if self._is_fuzzy:
             if self._is_full_path:
@@ -165,18 +196,34 @@ class LfCli(object):
 
     def _buildPattern(self):
         if self._is_fuzzy:
-            # supports refinement only in nameOnly mode
-            if (((self._supports_nameonly and not self._is_full_path) or
-                    self._supports_refine) and self._delimiter in self._cmdline):
-                self._refine = True
-                idx = self._cmdline.index(self._delimiter)
-                self._pattern = (''.join(self._cmdline[:idx]),
-                                 ''.join(self._cmdline[idx+1:]))
-                if self._pattern == ('', ''):
+            if self._and_delimiter in ''.join(self._cmdline).lstrip(self._and_delimiter) \
+                    and self._delimiter not in self._cmdline:
+                self._is_and_mode = True
+                patterns = re.split(r'['+self._and_delimiter+']+', ''.join(self._cmdline).strip(self._and_delimiter))
+                pattern_dict = OrderedDict([])
+                for p in patterns:
+                    if p in pattern_dict:
+                        pattern_dict[p] += 1
+                    else:
+                        pattern_dict[p] = 1
+                self._pattern = tuple([i * pattern_dict[i] for i in pattern_dict])
+                if self._pattern == ('',):
                     self._pattern = None
             else:
-                self._refine = False
-                self._pattern = ''.join(self._cmdline)
+                self._is_and_mode = False
+
+                # supports refinement only in nameOnly mode
+                if (((self._supports_nameonly and not self._is_full_path) or
+                        self._supports_refine) and self._delimiter in self._cmdline):
+                    self._refine = True
+                    idx = self._cmdline.index(self._delimiter)
+                    self._pattern = (''.join(self._cmdline[:idx]),
+                                     ''.join(self._cmdline[idx+1:]))
+                    if self._pattern == ('', ''):
+                        self._pattern = None
+                else:
+                    self._refine = False
+                    self._pattern = ''.join(self._cmdline)
         else:
             self._pattern = ''.join(self._cmdline)
 
@@ -282,6 +329,92 @@ class LfCli(object):
     def setRefineFeature(self, state):
         self._supports_refine = state
 
+    def writeHistory(self, category):
+        if not self._pattern:
+            return
+
+        if self._is_and_mode:
+            pattern = self._and_delimiter.join(self._pattern)
+        elif self._refine:
+            pattern = self._delimiter.join(self._pattern)
+        else:
+            pattern = self._pattern
+
+        history_dir = os.path.join(lfEval("g:Lf_CacheDirectory"), '.LfCache', 'history', category)
+        if self._is_fuzzy:
+            history_file = os.path.join(history_dir, 'fuzzy.txt')
+        else:
+            history_file = os.path.join(history_dir, 'regex.txt')
+
+        if not os.path.exists(history_dir):
+            os.makedirs(history_dir)
+
+        if not os.path.exists(history_file):
+            with lfOpen(history_file, 'w', errors='ignore'):
+                pass
+
+        with lfOpen(history_file, 'r+', errors='ignore') as f:
+            lines = f.readlines()
+
+            pattern += '\n'
+            if pattern in lines:
+                lines.remove(pattern)
+
+            if len(lines) >= int(lfEval("get(g:, 'Lf_HistoryNumber', '100')")):
+                del lines[0]
+
+            lines.append(pattern)
+
+            f.seek(0)
+            f.truncate(0)
+            f.writelines(lines)
+
+    def previousHistory(self, category):
+        history_dir = os.path.join(lfEval("g:Lf_CacheDirectory"), '.LfCache', 'history', category)
+        if self._is_fuzzy:
+            history_file = os.path.join(history_dir, 'fuzzy.txt')
+        else:
+            history_file = os.path.join(history_dir, 'regex.txt')
+
+        if not os.path.exists(history_file):
+            return False
+
+        with lfOpen(history_file, 'r', errors='ignore') as f:
+            lines = f.readlines()
+            if self._history_index == 0:
+                self._pattern_backup = self._pattern
+
+            if -self._history_index < len(lines):
+                self._history_index -= 1
+                self.setPattern(lines[self._history_index].rstrip())
+            else:
+                return False
+
+        return True
+
+    def nextHistory(self, category):
+        history_dir = os.path.join(lfEval("g:Lf_CacheDirectory"), '.LfCache', 'history', category)
+        if self._is_fuzzy:
+            history_file = os.path.join(history_dir, 'fuzzy.txt')
+        else:
+            history_file = os.path.join(history_dir, 'regex.txt')
+
+        if not os.path.exists(history_file):
+            return False
+
+        with lfOpen(history_file, 'r', errors='ignore') as f:
+            lines = f.readlines()
+            if self._history_index < 0:
+                self._history_index += 1
+                if self._history_index == 0:
+                    self.setPattern(self._pattern_backup)
+                else:
+                    self.setPattern(lines[self._history_index].rstrip())
+            else:
+                return False
+
+        return True
+
     @property
     def isPrefix(self): #assume that there are no \%23l, \%23c, \%23v, \%...
         pos = self._cursor_pos
@@ -312,24 +445,36 @@ class LfCli(object):
         return self._refine
 
     @property
+    def isAndMode(self):
+        return self._is_and_mode
+
+    @property
     def isFuzzy(self):
         return self._is_fuzzy
 
     @cursorController
     def input(self, callback):
         try:
+            self._history_index = 0
             self._blinkon = True
             while 1:
                 self._buildPrompt()
                 self._idle = False
 
-                if lfEval("g:Lf_CursorBlink") == '1' and callback() == False:
-                    time.sleep(0.002)
+                if lfEval("get(g:, 'Lf_NoAsync', 0)") == '0':
+                    try:
+                        callback()
+                        time.sleep(0.001) # cpu usage 100% without sleep
+                    except Exception as e:
+                        lfPrintError(e)
+                        break
 
-                if lfEval("g:Lf_CursorBlink") == '1':
+                time.sleep(0.005) #this is to solve issue 375 leaderF hangs in nvim-qt 
+                if lfEval("get(g:, 'Lf_NoAsync', 0)") == '0':
                     lfCmd("let nr = getchar(1)")
                     if lfEval("!type(nr) && nr == 0") == '1':
                         self._idle = True
+                        time.sleep(0.009) #this is to solve issue 375 leaderF hangs in nvim-qt 
                         continue
                     # https://groups.google.com/forum/#!topic/vim_dev/gg-l-kaCz_M
                     # '<80><fc>^B' is <Shift>, '<80><fc>^D' is <Ctrl>,
@@ -346,11 +491,12 @@ class LfCli(object):
                 else:
                     lfCmd("let nr = getchar()")
                     lfCmd("let ch = !type(nr) ? nr2char(nr) : nr")
+                    self._blinkon = True
 
                 if lfEval("!type(nr) && nr >= 0x20") == '1':
                     self._insert(lfEval("ch"))
                     self._buildPattern()
-                    if self._refine and self._pattern[1] == '': # e.g. abc;
+                    if self._pattern is None or (self._refine and self._pattern[1] == ''): # e.g. abc;
                         continue
                     yield '<Update>'
                 else:
@@ -379,14 +525,20 @@ class LfCli(object):
                         self._buildPattern()
                         yield '<Mode>'
                     elif equal(cmd, '<BS>') or equal(cmd, '<C-H>'):
+                        if not self._pattern:
+                            continue
                         self._backspace()
                         self._buildPattern()
                         yield '<Shorten>'
                     elif equal(cmd, '<C-U>'):
+                        if not self._pattern:
+                            continue
                         self._clearLeft()
                         self._buildPattern()
                         yield '<Shorten>'
                     elif equal(cmd, '<Del>'):
+                        if not self._pattern:
+                            continue
                         self._delete()
                         self._buildPattern()
                         yield '<Shorten>'
@@ -402,6 +554,14 @@ class LfCli(object):
                         self._toLeft()
                     elif equal(cmd, '<Right>'):
                         self._toRight()
+                    elif equal(cmd, '<ScrollWheelUp>'):
+                        yield '<C-K>'
+                        yield '<C-K>'
+                        yield '<C-K>'
+                    elif equal(cmd, '<ScrollWheelDown>'):
+                        yield '<C-J>'
+                        yield '<C-J>'
+                        yield '<C-J>'
                     elif equal(cmd, '<C-C>'):
                         yield '<Quit>'
                     else:

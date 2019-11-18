@@ -11,6 +11,8 @@ import locale
 lfCmd = vim.command
 lfEval = vim.eval
 
+lf_encoding = lfEval("&encoding")
+
 if sys.version_info >= (3, 0):
 
     def lfEncode(str):
@@ -25,7 +27,7 @@ if sys.version_info >= (3, 0):
 
     def lfBytesLen(str):
         """ string length in bytes """
-        return len(str.encode(lfEval("&encoding"), errors="ignore"))
+        return len(str.encode(lf_encoding, errors="ignore"))
 
     def lfBytes2Str(bytes, encoding=None):
         try:
@@ -50,7 +52,7 @@ else: # python 2.x
             if locale.getdefaultlocale()[1] is None:
                 return str
             else:
-                return str.decode(locale.getdefaultlocale()[1]).encode(lfEval("&encoding"))
+                return str.decode(locale.getdefaultlocale()[1]).encode(lf_encoding)
         except ValueError:
             return str
         except UnicodeDecodeError:
@@ -61,9 +63,11 @@ else: # python 2.x
             if locale.getdefaultlocale()[1] is None:
                 return str
             else:
-                return str.decode(lfEval("&encoding")).encode(
+                return str.decode(lf_encoding).encode(
                         locale.getdefaultlocale()[1])
         except UnicodeDecodeError:
+            return str
+        except:
             return str
 
     def lfOpen(file, mode='r', buffering=-1, encoding=None, errors=None,
@@ -133,5 +137,18 @@ def lfRelpath(path, start=os.curdir):
     except ValueError:
         return path
 
+def lfWinId(winnr, tab=None):
+    if lfEval("exists('*win_getid')") == '1':
+        if tab:
+            return int(lfEval("win_getid(%d, %d)" % (winnr, tab)))
+        else:
+            return int(lfEval("win_getid(%d)" % winnr))
+    else:
+        return None
+
 def lfPrintError(error):
-    lfCmd("echohl Error | redraw | echo '%s' | echohl None" % escQuote(str(error)))
+    if lfEval("get(g:, 'Lf_Exception', 0)") == '1':
+        raise error
+    else:
+        error = lfEncode(str(repr(error)))
+        lfCmd("echohl Error | redraw | echo '%s' | echohl None" % escQuote(error))

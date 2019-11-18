@@ -30,6 +30,14 @@ function! leaderf#File#Maps()
     nnoremap <buffer> <silent> s             :exec g:Lf_py "fileExplManager.addSelections()"<CR>
     nnoremap <buffer> <silent> a             :exec g:Lf_py "fileExplManager.selectAll()"<CR>
     nnoremap <buffer> <silent> c             :exec g:Lf_py "fileExplManager.clearSelections()"<CR>
+    nnoremap <buffer> <silent> p             :exec g:Lf_py "fileExplManager._previewResult(True)"<CR>
+    nnoremap <buffer> <silent> j             j:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> k             k:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> <Up>          <Up>:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> <Down>        <Down>:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> <PageUp>      <PageUp>:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> <PageDown>    <PageDown>:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
+    nnoremap <buffer> <silent> <LeftMouse>   <LeftMouse>:exec g:Lf_py "fileExplManager._previewResult(False)"<CR>
     if has_key(g:Lf_NormalMap, "File")
         for i in g:Lf_NormalMap["File"]
             exec 'nnoremap <buffer> <silent> '.i[0].' '.i[1]
@@ -37,19 +45,10 @@ function! leaderf#File#Maps()
     endif
 endfunction
 
-function! leaderf#File#startExpl(win_pos, ...)
-    if a:0 == 0
-        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."')")
-    else
-        let dir = fnamemodify(a:1.'/',":h:gs?\\?/?")
-        call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."', arguments={'directory': ['".dir."']})")
-    endif
-endfunction
-
-function! leaderf#File#startExplPattern(win_pos, pattern)
-    call leaderf#LfPy("fileExplManager.startExplorer('".a:win_pos."', pattern='".a:pattern."')")
-endfunction
-
 function! leaderf#File#cleanup()
     call leaderf#LfPy("fileExplManager._beforeExit()")
+endfunction
+
+function! leaderf#File#TimerCallback(id)
+    call leaderf#LfPy("fileExplManager._workInIdle(bang=True)")
 endfunction

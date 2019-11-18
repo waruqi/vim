@@ -7,12 +7,6 @@
 " License:     Apache License, Version 2.0
 " ============================================================================
 
-if exists('g:leaderf#loaded')
-    finish
-else
-    let g:leaderf#loaded = 1
-endif
-
 if !exists("g:Lf_PythonVersion")
     if has("python3")
         let g:Lf_PythonVersion = 3
@@ -21,9 +15,7 @@ if !exists("g:Lf_PythonVersion")
         let g:Lf_PythonVersion = 2
         let g:Lf_py = "py "
     else
-        echohl Error
-        echo "Error: LeaderF requires vim compiled with +python or +python3"
-        echohl None
+        echoe "Error: LeaderF requires vim compiled with +python or +python3"
         finish
     endif
 else
@@ -31,21 +23,23 @@ else
         if has("python")
             let g:Lf_py = "py "
         else
-            echohl Error
-            echo 'LeaderF Error: has("python") == 0'
-            echohl None
+            echoe 'LeaderF Error: has("python") == 0'
             finish
         endif
     else
         if has("python3")
             let g:Lf_py = "py3 "
         else
-            echohl Error
-            echo 'LeaderF Error: has("python3") == 0'
-            echohl None
+            echoe 'LeaderF Error: has("python3") == 0'
             finish
         endif
     endif
+endif
+
+if exists('g:leaderf#loaded')
+    finish
+else
+    let g:leaderf#loaded = 1
 endif
 
 silent! exec g:Lf_py "pass"
@@ -116,6 +110,7 @@ call s:InitVar('g:Lf_RememberLastSearch', 0)
 call s:InitVar('g:Lf_UseCache', 1)
 call s:InitVar('g:Lf_RootMarkers', ['.git', '.hg', '.svn'])
 call s:InitVar('g:Lf_WorkingDirectoryMode', 'c')
+call s:InitVar('g:Lf_WorkingDirectory', '')
 call s:InitVar('g:Lf_ShowHidden', 0)
 call s:InitDict('g:Lf_PreviewResult', {
             \ 'File': 0,
@@ -130,6 +125,12 @@ call s:InitDict('g:Lf_PreviewResult', {
 call s:InitDict('g:Lf_NormalMap', {})
 call s:InitVar('g:Lf_Extensions', {})
 call s:InitDict('g:Lf_CtagsFuncOpts', {})
+call s:InitVar('g:Lf_MaxCount', 2000000)
+call s:InitDict('g:Lf_GtagsfilesCmd', {
+            \ '.git': 'git ls-files --recurse-submodules',
+            \ '.hg': 'hg files',
+            \ 'default': 'rg --no-messages --files'
+            \})
 
 let s:Lf_CommandMap = {
             \ '<C-A>':         ['<C-A>'],
@@ -190,7 +191,9 @@ let s:Lf_CommandMap = {
             \ '<MiddleMouse>': ['<MiddleMouse>'],
             \ '<2-LeftMouse>': ['<2-LeftMouse>'],
             \ '<C-LeftMouse>': ['<C-LeftMouse>'],
-            \ '<S-LeftMouse>': ['<S-LeftMouse>']
+            \ '<S-LeftMouse>': ['<S-LeftMouse>'],
+            \ '<ScrollWheelUp>': ['<ScrollWheelUp>'],
+            \ '<ScrollWheelDown>': ['<ScrollWheelDown>']
             \}
 
 function! s:InitCommandMap(var, dict)
@@ -241,3 +244,27 @@ function! leaderf#LfPy(cmd)
     exec g:Lf_py . a:cmd
 endfunction
 
+" return the visually selected text and quote it with double quote
+function! leaderf#visual()
+    try
+        let x_save = @x
+        norm! gv"xy
+        return '"' . escape(@x, '"') . '"'
+    finally
+        let @x = x_save
+    endtry
+endfunction
+
+function! leaderf#previewFilter(winid, key)
+    if a:key == "\<ESC>"
+        call popup_close(a:winid)
+        redraw
+        return 1
+    elseif a:key == "\<CR>"
+        call popup_close(a:winid)
+        redraw
+        return 0
+    endif
+endfunction
+
+autocmd FileType leaderf let b:coc_enabled = 0 | let b:coc_suggest_disable = 1
