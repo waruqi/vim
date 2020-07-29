@@ -110,9 +110,10 @@ set clipboard=unnamed
 :map <C-Z> u
 
 " paste from clipboard when in insert mode.
-imap <C-V> <ESC>gpa
+imap <C-V> <ESC>"_dP
 " paste from clipboard when in visual mode. (Replace whatever is selected in visual mode.)
-vmap <C-V> gp
+" fix some clipboard bugs, @see https://stackoverflow.com/questions/290465/how-to-paste-over-without-overwriting-register
+vmap <C-V> "_dP
 
 " select all: ctrl+a
 :map <C-A> ggVG
